@@ -11,13 +11,27 @@
 #
 # USAGE
 #
-#     ./galyleo.sh configure --user mkandes
+#     If the user does not already have SSH keys configured, the 
+#     'configure' command will generate an SSH keypair for them and 
+#     upload the pair's public key their authorized_users file on Comet.
 #
-#     ./galyleo.sh launch --user mkandes --account use300 --partition gpu-shared --nodes 1 --tasks-per-node 6 --gpus-per-node 1 --time-limit 00:30:00 --image /share/apps/gpu/singularity/images/pytorch/pytorch-gpu.simg --workdir /oasis/scratch/comet/mkandes/temp_project
+#         ./galyleo.sh configure --user mkandes
+#
+#     Once SSH keys are setup, the following 'launch' command will 
+#     create and submit a batch job script to Slurm that will run a 
+#     Jupyter notebook from Comet's GPU-acclerated PyTorch Singularity 
+#     container on a single GPU for 30 minutes.
+#
+#         ./galyleo.sh launch --user mkandes --account use300 --partition gpu-shared --nodes 1 --tasks-per-node 6 --gpus-per-node 1 --time-limit 00:30:00 --image /share/apps/gpu/singularity/images/pytorch/pytorch-gpu.simg --workdir /oasis/scratch/comet/mkandes/temp_project
+#
+#     Similarly, the following 'launch' command will run a basic 
+#     Jupyter lab session on Comet for 30 minutes. 
+#
+#         ./galyleo.sh launch --lab --user mkandes --account use300 --partition debug --nodes 1 --tasks-per-node 24 --time-limit 00:30:00 --image /share/apps/compute/singularity/images/jupyter/jupyter-cpu.simg --workdir /oasis/scratch/comet/mkandes/temp_project
 #
 # LAST UPDATED
 #
-#     Wednesday, March 13th, 2019
+#     Thursday, May 16th, 2019
 #
 # ----------------------------------------------------------------------
 
@@ -148,6 +162,7 @@ galyleo_launch() {
   local jupyter='jupyter'
   local image='/share/apps/compute/singularity/images/jupyter/jupyter-cpu.simg'
   local workdir=''
+  local workspace='notebook'
 
   local galyleo_job_id=''
   local job_script=''
@@ -162,57 +177,76 @@ galyleo_launch() {
     case "${1}" in
       -u | --user )
         user="${2}"
+        shift 2
         ;;
       -s | --system )
         system="${2}"
+        shift 2
         ;;
       -d | --domain )
         domain="${2}"
+        shift 2
         ;;
       -k | --key )
         key="${2}"
+        shift 2
         ;;
       -j | --job-name )
         job_name="${2}"
+        shift 2
         ;;
       -a | --account )
         account="${2}"
+        shift 2
         ;;
       -p | --partition )
         partition="${2}"
+        shift 2
         ;;
       -n | --nodes )
         nodes="${2}"
+        shift 2
         ;;
       -t | --tasks-per-node )
         tasks_per_node="${2}"
+        shift 2
         ;;
       -c | --cpus-per-task )
         cpus_per_task="${2}"
+        shift 2
         ;;
       -g | --gpus-per-node )
         gpus_per_node="${2}"
+        shift 2
         ;;
       -gt | --gpu-type )
         gpu_type="${2}"
+        shift 2
         ;;
       -w | --time-limit )
         time_limit="${2}"
+        shift 2
         ;;
       -i | --image )
         image="${2}"
+        shift 2
         ;;
       --workdir )
         workdir="${2}"
+        shift 2
         ;;
       --ipython )
         jupyter='ipython'
+        shift 1
+        ;;
+      --lab )
+        workspace='lab'
+        shift 1
         ;;
       *)
         galyleo_error "Command-line option ${1} not recognized or not supported."
         return 1
     esac
-    shift 2
   done
   galyleo_output "All command-line options for 'launch' command have been read. "
 
@@ -271,7 +305,7 @@ galyleo_launch() {
   echo "printenv" >> "${job_script}"
   echo " " >> "${job_script}"
   echo "cd ${SLURM_SUBMIT_DIR}" >> "${job_script}"
-  echo "singularity exec ${image} ${jupyter} notebook --notebook-dir=${workdir} --no-browser --port=${port} --NotebookApp.token=${token}" >> "${job_script}"
+  echo "singularity exec ${image} ${jupyter} ${workspace} --notebook-dir=${workdir} --no-browser --port=${port} --NotebookApp.token=${token}" >> "${job_script}"
   galyleo_output "Batch job script generated."
 
   galyleo_output "Uploading Jupyter batch job script to ${system} ..."
