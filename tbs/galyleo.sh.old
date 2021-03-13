@@ -1,0 +1,867 @@
+#/usr/bin/env bash
+# ======================================================================
+#
+# NAME
+# 
+#     galyleo.sh
+#
+# DESCRIPTION
+#
+#     A bash script to help launch Jupyter notebooks on a remote batch 
+#     system.
+#
+# USAGE
+#
+#     If the user does not already have SSH keys configured, the 
+#     'configure' command will generate an SSH keypair for them and 
+#     upload the pair's public key their authorized_users file on Comet.
+#
+#         ./galyleo.sh configure --user mkandes
+#
+#     Once SSH keys are setup, the following 'launch' command will 
+#     create and submit a batch job script to Slurm that will run a 
+#     Jupyter notebook from Comet's GPU-acclerated PyTorch Singularity 
+#     container on a single GPU for 30 minutes.
+#
+#         ./galyleo.sh launch --user mkandes --account use300 --partition gpu-shared --nodes 1 --tasks-per-node 6 --gpus-per-node 1 --time-limit 00:30:00 --image /share/apps/gpu/singularity/images/pytorch/pytorch-gpu.simg --workdir /oasis/scratch/comet/mkandes/temp_project
+#
+#     Similarly, the following 'launch' command will run a basic 
+#     Jupyter lab session on Comet for 30 minutes. 
+#
+#         ./galyleo.sh launch --lab --user mkandes --account use300 --partition debug --nodes 1 --tasks-per-node 24 --time-limit 00:30:00 --image /share/apps/compute/singularity/images/jupyter/jupyter-cpu.simg --workdir /oasis/scratch/comet/mkandes/temp_project
+#
+# TODO
+#
+#  X   0. Remove key managment from galyleo; put mangement help in vinz.
+#
+#  X   1. Check for default ssh key first. If not found, then ask for ssh
+#        login password, else tell user to select ssh key to use via --key option.
+#
+#     2. Automatically strip any SINGULARITYENV_ environment variables 
+#        in client's current shell environment and add them to remote 
+#        host's environment prior to launching singualrity exec command. 
+#        Also, add command-line options for modifying 
+#        SINGULARITYENV_PREPEND_PATH, SINGULARITYENV_APPEND_PATH, and 
+#        SINGULARITYENV_PATH specifically. command-line options will 
+#        override those found in local env
+#
+#     3. Separate system name from hostname for simplicity. 
+#
+#     4. Provide simple key-value store for container locations on remote system?
+#
+#     5. Add support for Bridges and Stampede2? Must move to 
+#        login-node-based forwarding to get around lack of public 
+#        addresses. Might as well move to same model for Comet too.
+#        Use direct or one-hop tunnel: https://superuser.com/questions/96489/an-ssh-tunnel-via-multiple-hops
+#
+#     6. Check port if ephemeral port(s) are available across each 
+#        system; use ssh as the control channel to coordinate or maybe 
+#        slurm itself as per Trevor's comment:
+#       
+#        "How do you get the dynamically generated port number from the 
+#        allocated compute node back to the client AFTER successfully 
+#        starting singularity while using it?
+#
+#        Inside the job script...
+#
+#           $ scontrol update jobid=${SLURM_JOB_ID} comment="<some_value>"
+#
+#        From the client...
+#
+#           $ squeue -j ${slurm_job_id} --noheader --Format='state,comment'
+#             RUNNING             <some_value>"
+#
+#     7. To help mimimize resource waste, have client shutdown/scancel 
+#        jobs if jupyter is not detected as running after job has 
+#        started running for some time. Place shutdown scripts on both 
+#        login node and worker node(s).
+#
+#   X  8. Still help check if users are using protected ssh key pairs. 
+#        Another suggestion from Trevor: 
+#
+#        "If you are going to provide a wrapper to help the user setup 
+#        an ssh key pair I would recommend you also help them create a 
+#        SECURE key pair. Minimally a key pair with a password on the 
+#        private key. You can detect this by attempting to load the key
+#        into an agent and checking for the password prompt. If no 
+#        password prompt is generated you should ask the user if they
+#        REALLY want to use an insecure key pair OR (preferably) you 
+#        should block their use of insecure key pairs EXPLICITLY in your
+#        wrapper/helper. If they are smart enough to modify the wrapper
+#        to disable that functionality they are probably smart enough to
+#        know why they shouldn't."
+#
+#     9. Create ability to upload singularity container from local 
+#        system to remote system. Or instead, simply allow user to 
+#        provide list/manifest of files to upload prior to job start?
+#
+#    10. Provide mechanism to define/add systems and define their XSEDE 
+#        CUE (Common User Environment) variables.
+#     
+# LAST UPDATED
+#
+#    Thursday, September 12th, 2019
+#
+# ----------------------------------------------------------------------
+
+declare -xr CURRENT_LOCAL_TIME="$(date +'%Y%m%dT%H%M%S%z')"
+declare -xir CURRENT_UNIX_TIME="$(date +'%s')"
+declare -xir LOWEST_EPHEMERAL_PORT=49152
+declare -xir HIGHEST_EPHEMERAL_PORT=65535
+
+# ----------------------------------------------------------------------
+# galyleo_output
+#
+#   Prints a message to standard output.
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#   ${@}
+#
+# Returns:
+#   None
+# ----------------------------------------------------------------------
+galyleo_output() {
+
+  echo "${@}" >&1
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_error
+#
+#   Prints an error message to standard error.
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#   ${@}
+#
+# Returns:
+#   None
+# ----------------------------------------------------------------------
+galyleo_error() {
+
+  echo "ERROR :: ${@}" >&2
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_warning
+#
+#   Prints a warning message to standard error.
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#   ${@}
+#
+# Returns:
+#   None
+# ----------------------------------------------------------------------
+galyleo_warning() {
+
+  echo "WARNING :: ${@}" >&2
+
+}
+
+# ----------------------------------------------------------------------
+# galyelo_check_authorized_keys
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#
+# Returns:
+#   0
+#   1
+# ----------------------------------------------------------------------
+galyelo_check_authorized_keys() {
+
+  # check if user-selected keypair's public key is in remote 
+  # authorized_keys file; 
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_check_ssh_config
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#
+# Returns:
+#   0
+#   1
+# ----------------------------------------------------------------------
+galyleo_check_ssh_config() {
+
+  # check for host configuration in local ~/.ssh/config file
+
+  local hostname="${1}"
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_find_local_ephemeral_port
+# 
+#   Finds an open ephemeral port on the local system. 
+#
+# Globals:
+#   LOWEST_EPHEMERAL_PORT=49152
+#
+# Arguments:
+#   None
+#
+# Returns:
+#   local_ephemeral_port
+#
+# ----------------------------------------------------------------------
+galyleo_find_ephemeral_port() {
+
+  local -i local_ephemeral_port=-1
+  local -i local_test_port=-1
+
+  galyleo_output "Searching for an open ephemeral port on ${HOSTNAME} ..."
+  while (( "${local_ephemeral_port}" < 0 )); do
+    galyleo_output "Generating ephemeral port number ..."
+    while (( "${local_test_port}" < "${LOWEST_EPHEMERAL_PORT}" )); do
+      local_test_port="$(od -An -N 2 -t u2 -v < /dev/urandom)"
+    done
+    galyleo_output "Ephemeral port number generated: ${test_port}"
+    galyleo_output "Checking if ephemeral port number ${test_port} is already in use ..."
+    if [[ "$(netstat -nat | cut -d ':' -f2 | grep ^${test_port})" -eq 1 ]]; then
+      galyleo_output "Ephemeral port number ${test_port} not currently in use."
+      local_ephemeral_port="${test_port}"
+    fi
+  done
+
+  return local_ephemeral_port
+
+}
+
+galyleo_environment() {
+  # allow custom GALYLEOENV_ environment variables
+  # in addition to SINGULARITYENV_ environment variables
+  # both sets will be propagated to batch job script.
+  return 0
+}
+
+# ----------------------------------------------------------------------
+# galyleo_ssh_keypair_exists
+# 
+#   Checks if local SSH keypair exists in a user's ~/.ssh directory.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   ssh_private_key
+#
+# Returns:
+#   0 if ssh_private_key/ssh_public_key are found in ~/.ssh
+#   1 if ssh_private_key/ssh_public_key are not found in ~/.ssh
+# ----------------------------------------------------------------------
+galyleo_ssh_keypair_exists() {
+
+  # Define local variables.
+  local ssh_private_key
+  local ssh_public_key
+
+  # Read in input variables and assign to local variables.
+  ssh_private_key="${1}"
+  ssh_public_key="${ssh_private_key}.pub"
+
+  # Check if private SSH key exists.
+  galyleo_output "Checking if private SSH key exists ..."
+  if [[ ! -f "${HOME}/.ssh/${ssh_private_key}" ]]; then
+    galyleo_error "Private SSH key not found: ${HOME}/.ssh/${ssh_private_key}"
+    return 1
+  else
+    galyleo_output "Private SSH key found: ${HOME}/.ssh/${ssh_private_key}"
+  fi
+
+  # Check if public SSH key exists.
+  galyleo_output "Checking if public SSH key exists ..."
+  if [[ ! -f "${HOME}/.ssh/${ssh_public_key}" ]]; then
+    galyleo_error "Public SSH key not found: ${HOME}/.ssh/${ssh_public_key}"
+    return 1
+  else
+    galyleo_output "Public SSH key ${ssh_public_key} found: ${HOME}/.ssh/${ssh_public_key}"
+  fi
+
+  # If both private and public SSH keys are found, then keypair exists.
+  galyleo_output "SSH keypair ${ssh_private_key}/${ssh_public_key} exists." 
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_ssh_private_key_has_passphrase
+# 
+#   Checks if private SSH key is protected by a passphrase.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   ssh_private_key
+#
+# Returns:
+#   0 if ssh_private_key is protected by passphrase.
+#   1 if ssh_private_key is not protected by passphrase.
+# ----------------------------------------------------------------------
+galyleo_ssh_private_key_has_passphrase() {
+
+  # Define local variables.
+  local ssh_private_key
+
+  # Read in input variables and assign to local variables.
+  ssh_private_key="${1}"
+
+  # Check if private SSH key is secured with a passphrase.
+  galyleo_output "Checking if SSH keypair is secured with a passphrase ..."
+  galyleo_output "Attempting to change passphrase on private SSH key ${HOME}/.ssh/${ssh_private_key} ..."
+  galyleo_output "  ssh-keygen -p -P '' -N '' -f ${HOME}/.ssh/${ssh_private_key}"
+  ssh-keygen -p -P '' -N '' -f "${HOME}/.ssh/${ssh_private_key}"
+  if [[ "${?}" -eq 0 ]]; then
+    galyleo_output "Passphrase changed succeeded."
+    galyleo_error "Private SSH key is not protected by a passphrase."
+    return 1
+  fi
+
+  # If passphrase change failed, then private SSH key is secure.
+  galyleo_output "Passphrase changed failed."
+  galyleo_output "Private SSH key is protected by a passphrase."
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_ssh_keypair_can_authenticate
+# 
+#   Checks if local SSH keypair can authenticate to remote host.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   remote_username
+#   remote_hostname
+#   ssh_private_key
+#
+# Returns:
+#   0 if ssh_private_key/ssh_public_key can authenticate to 
+#       remote_hostname via ssh. 
+#   1 if ssh_private_key/ssh_public_key cannot authenticate to 
+#       remote_hostname via ssh.
+# ----------------------------------------------------------------------
+galyleo_ssh_keypair_can_authenticate() {
+
+  # Define local variables.
+  local remote_username
+  local remote_hostname
+  local ssh_private_key
+  local ssh_public_key
+
+  # Read in input variables and assign to local variables.
+  remote_username="${1}"
+  remote_hostname="${2}"
+  ssh_private_key="${3}"
+  ssh_public_key="${ssh_private_key}.pub"
+
+  # Check if local SSH keypair can authenticate to remote host.
+  galyleo_output "Checking if SSH keypair can authenticate to remote host ..."
+  galyleo_output "  ssh -i ${HOME}/.ssh/${ssh_private_key} ${remote_username}@${remote_hostname} touch ~/.ssh"
+  ssh -i "${HOME}/.ssh/${ssh_private_key}" \
+      -o IdentitiesOnly=yes \
+      -o PasswordAuthentication=no \
+      -o PubkeyAuthentication=yes \
+      -o PreferredAuthentications=publickey \
+      "${remote_username}@${remote_hostname}" "touch ~/.ssh"
+  if [[ "${?}" -ne 0 ]]; then
+    galyleo_warning "SSH public key authentication failed."
+    return 1
+  fi
+
+  # If ssh command succeeded, then local SSH keypair authenticated with 
+  # remote host successfully.
+  galyleo_output "SSH public key authentication succeeded."
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_ssh_upload_public_key
+# 
+#   Uploads local SSH public key to user's ~/.ssh/authorized_keys file 
+#   on remote host via password authentication.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   remote_username
+#   remote_hostname
+#   ssh_private_key
+#
+# Returns:
+#   0 if ssh-copy-id command succeeds.
+#   1 if ssh-copy-id command fails.
+# ----------------------------------------------------------------------
+galyleo_ssh_upload_public_key() {
+
+  # Define local variables.
+  local remote_username
+  local remote_hostname
+  local ssh_private_key
+  local ssh_public_key
+
+  # Read in input variables and assign to local variables.
+  remote_username="${1}"
+  remote_hostname="${2}"
+  ssh_private_key="${3}"
+  ssh_public_key="${ssh_private_key}.pub"
+
+  # Copy public SSH key to ~/.ssh/authorized_keys file on remote host
+  # via password authentication.
+  galyleo_warning 'Public SSH key must be authorized on remote host.'
+  galyleo_output 'Uploading public SSH key to remote host ...'
+  galyleo_output "  ssh-copy-id -i ${HOME}/.ssh/${ssh_private_key} ${remote_username}@${remote_hostname}"
+  ssh-copy-id -i "${HOME}/.ssh/${ssh_private_key}" \
+              -o PasswordAuthentication=yes \
+              -o PubkeyAuthentication=no \
+              -o PreferredAuthentications=password \
+              "${remote_username}@${remote_hostname}"
+  if [[ "${?}" -ne 0 ]]; then
+    galyleo_error 'Upload of public SSH key to remote host failed.'
+    return 1
+  fi
+
+  # If ssh-copy-id command succeeded, then SSH public key should have 
+  # been written to ~/.ssh/authorized_keys file on remote host.
+  galyleo_output 'Public SSH key uploaded successfully to remote host.'
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_remote_directory_exists
+# 
+#   Checks if directory exists (and is accessible) on a remote filesystem.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   local remote_username
+#   local remote_hostname
+#   local jupyter_notebook_dir
+#
+# Returns:
+#   0 if ssh-copy-id command succeeds.
+#   1 if ssh-copy-id command fails.
+# ----------------------------------------------------------------------
+galyleo_ssh_upload_public_key() {
+
+  # Define local variables.
+  local remote_username
+  local remote_hostname
+  local remote_directory
+
+  # Read in input variables and assign to local variables.
+  remote_username="${1}"
+  remote_hostname="${2}"
+  remote_directory="${3}"
+
+  # Copy public SSH key to ~/.ssh/authorized_keys file on remote login 
+  # host via password authentication.
+  galyleo_warning 'Public SSH key must be authorized on remote login host.'
+  galyleo_output 'Uploading public SSH key to remote login host ...'
+  ssh-copy-id -i "${HOME}/.ssh/${ssh_private_key}" \
+              -o PasswordAuthentication=yes \
+              -o PubkeyAuthentication=no \
+              -o PreferredAuthentications=password \
+              "${remote_username}@${remote_login_hostname}"
+  if [[ "${?}" -ne 0 ]]; then
+    galyleo_error 'Upload of public SSH key to remote host failed.'
+    return 1
+  fi
+
+  # If ssh-copy-id command succeeded, then SSH public key should have 
+  # been written to ~/.ssh/authorized_keys file on remote login host.
+  galyleo_output 'Public SSH key uploaded successfully to remote login host.'
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_launch
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#
+# Returns:
+#   0
+#   1
+# ----------------------------------------------------------------------
+galyleo_launch() {
+
+  # Define local variables with default values.
+  local remote_username="${USER}"
+  local remote_login_hostname='comet.sdsc.edu'
+  local ssh_private_key='id_rsa'
+  local batch_job_script=''
+  local batch_scheduler='slurm'
+  local batch_job_name='galyleo'
+  local batch_account=''
+  local batch_reservation=''
+  local batch_queue='debug'
+  local -i batch_nodes=1
+  local -i batch_cpus_per_node=24
+  local -i batch_cpu_memory=0
+  local -i batch_gpus_per_node=0
+  local batch_gpu_type=''
+  local batch_wallclock_time_limit='00:30:00'
+  local jupyter_interface='notebook'
+  local jupyter_notebook_dir='' 
+  local files_to_transfer=''
+  local singularity_container=''
+
+  # Read in command-line options and assign input variables to local variables.
+  while (("${#}" > 0)); do
+    case "${1}" in
+      -u | --username )
+        remote_username="${2}"
+        shift 2
+        ;;
+      -h | --hostname )
+        remote_login_hostname="${2}"
+        shift 2
+        ;;
+      -k | --keypair )
+        ssh_private_key="${2}"
+        shift 2
+        ;;
+      --scheduler )
+        batch_scheduler="${2}"
+        shift 2
+        ;;
+      -s | --script )
+        batch_script="${2}"
+        shift 2
+        ;;
+      -j | --job-name )
+        batch_job_name="${2}"
+        shift 2
+        ;;
+      -a | --account )
+        batch_account="${2}"
+        shift 2
+        ;;
+      -r | --reservation )
+        batch_reservation="${2}"
+        shift 2
+        ;;
+      -q | --queue )
+        batch_queue="${2}"
+        shift 2
+        ;;
+      -n | --nodes )
+        batch_nodes="${2}"
+        shift 2
+        ;;
+      -c | --cpus-per-node )
+        batch_cpus_per_node="${2}"
+        shift 2
+        ;;
+      -m | --memory )
+        batch_cpu_memory="${2}"
+        shift 2
+        ;;
+      -g | --gpus-per-node )
+        batch_gpus_per_node="${2}"
+        shift 2
+        ;;
+      --gpu-type )
+        batch_gpu_type="${2}"
+        shift 2
+        ;;
+      -w | --wallclock-time-limit )
+        batch_wallclock_time_limit="${2}"
+        shift 2
+        ;;
+      -i | --interface )
+        jupyter_interface="${2}"
+        shift 2
+        ;;
+      -d | --working-directory )
+        jupyter_notebook_dir="${2}"
+        shift 2
+        ;;
+      -s | --scratch-directory )
+        remote_scratch_directory="${2}"
+        shift 2
+        ;;
+      -f | --files )
+        files_to_transfer="${2}"
+        shift 2
+        ;;
+      --singularity-container )
+        singularity_container="${2}"
+        shift 2
+        ;;
+      --help )
+        print_launch_command_help_only='TRUE'
+        shift 1
+        ;;
+      *)
+        galyleo_error "Command-line option ${1} not recognized or not supported."
+        return 1
+    esac
+  done
+
+  # Check if user is only seeking help about how to use launch command.
+  # If they are, then abort the launch and print out help information 
+  # provided below. Otherwise, continue to proceed with launch. 
+  if [[ "${print_launch_command_help_only}" = 'TRUE' ]]; then
+    echo 'HELP: ... '
+    return 0
+  fi
+
+  # Print all command-line options read in for launch to standard output.
+  galyleo_output '* * * * * * * * * * * * * * * * * * * * * * * * * * * * *'
+  galyleo_output 'Preparing galyleo for launch into Jupyter orbit ...'
+  galyleo_output ''
+  galyleo_output "  remote_username: ${remote_username}"
+  galyleo_output "  remote_login_hostname: ${remote_login_hostname}"
+  galyleo_output "  ssh_private_key: ${HOME}/.ssh/${ssh_private_key}"
+  galyleo_output "  batch_scheduler: ${batch_scheduler}"
+  galyleo_output "  batch_job_script: ${batch_job_script}"
+  galyleo_output "  batch_job_name: ${batch_job_name}"
+  galyleo_output "  batch_account: ${batch_account}"
+  galyleo_output "  batch_reservation: ${batch_reservation}"
+  galyleo_output "  batch_queue: ${batch_queue}"
+  galyleo_output "  batch_cpus_per_node: ${batch_cpus_per_node}"
+  galyleo_output "  batch_cpu_memory: ${batch_cpu_memory}"
+  galyleo_output "  batch_gpus_per_node: ${batch_gpus_per_node}"
+  galyleo_output "  batch_gpu_type: ${batch_gpu_type}"
+  galyleo_output "  batch_wallclock_time_limit: ${batch_wallclock_time_limit}"
+  galyleo_output "  jupyter_interface: ${jupyter_interface}"
+  galyleo_output "  jupyter_notebook_dir: ${jupyter_notebook_dir}"
+  galyleo_output "  files_to_transfer: ${files_to_transfer}"
+  galyleo_output "  singularity_container: ${singularity_container}"
+  galyleo_output ''
+
+  # Check if the SSH keypair exists. Require use of SSH keys.
+  galyleo_ssh_keypair_exists "${ssh_private_key}"
+  if [[ "${?}" -ne 0 ]]; then
+    # Failed to find SSH keypair. Halt launch.
+    galyleo_error 'Use of SSH keys is required.'
+    return 1
+  fi
+  galyleo_output ''
+
+  # If the SSH keypair exists, then check if the private SSH key is 
+  # protected with a passphrase. Require use of an SSH passphrase.
+  galyleo_ssh_private_key_has_passphrase "${ssh_private_key}"
+  if [[ "${?}" -ne 0 ]]; then
+    # Private SSH key is not protected by a passphrase. Halt launch.
+    galyleo_error 'Private SSH key must be secured by a passphrase.'
+    return 1
+  fi
+  galyleo_output ''
+
+  # If private SSH key is protected by a passphrase, then check if SSH 
+  # keypair can be used to authenticate to remote login host.
+  galyleo_ssh_keypair_can_authenticate "${remote_username}" "${remote_login_hostname}" "${ssh_private_key}"
+  if [[ "${?}" -ne 0 ]]; then 
+    # Authentication failed. Attempt to upload public SSH key to remote 
+    # login host via SSH password authentication.
+    galyleo_ssh_upload_public_key "${remote_username}" "${remote_login_hostname}" "${ssh_private_key}"
+    if [[ "${?}" -eq 0 ]]; then
+      # Upload of public SSH key to remote login host was successful. 
+      # Re-check SSH public key authentication to remote login host.
+      galyleo_ssh_keypair_can_authenticate "${remote_username}" "${remote_login_hostname}" "${ssh_private_key}"
+      if [[ "${?}" -ne 0 ]]; then
+        # Authentication failed again. Halt launch.
+        galyleo_error 'SSH public key authentication is required.'
+        return 1
+      fi
+    else
+      # Upload of public SSH key to remote login host failed. Halt launch.
+      galyleo_error 'Public SSH key must be authorized on remote host.'
+      return 1
+    fi
+  fi
+  galyleo_output ''
+
+  # If SSH keypair successfully authenticates to remote login host, then 
+  # check if the user specified a working directory for the Jupyter 
+  # notebook/lab to use.
+  if [[ -z "${jupyter_notebook_dir}" ]]; then
+    # User did not specify a working directory. Set the working 
+    # directory to the user's HOME directory on the remote login host. 
+    # Note, however, this assumes that the user's HOME directory is 
+    # located on a shared filesystem, which will then also be available
+    # on the remote compute host where the Jupyter notebook/lab server
+    # will run. *** Maybe we should only check for 
+    jupyter_notebook_dir="$(ssh -i ${HOME}/.ssh/${ssh_private_key} \
+                                -o IdentitiesOnly=yes \
+                                -o PasswordAuthentication=no \
+                                -o PubkeyAuthentication=yes \
+                                -o PreferredAuthentications=publickey \
+                                   ${remote_username}@${remote_login_hostname} \
+                                   'echo ${HOME}')"
+  fi
+
+  # Next, check if working directory exists on remote (shared) filesystem. 
+  galyleo_working_directory_exists "${remote_username}" "${remote_login_hostname}" "${jupyter_notebook_dir}"
+  if [[ "${?}" -ne 0 ]]; then
+    # Working directory does not exist on remote (shared) filesystem. 
+    # Attempt to create working directory on remote (shared) filesystem. 
+    galyleo_create_working_directory "${remote_username}" "${remote_login_hostname}" "${jupyter_notebook_dir}"
+    if [[ "${?}" -ne 0 ]]; then
+      # Failed to create working directory on remote (shared) 
+      # filesystem. Halt launch.
+      galyleo_error 'Working directory must exist on remote (shared) filesystem.'
+      return 1
+    fi
+  fi
+
+  # If remote working directory exists, attempt to upload files to be 
+  # transferred to the remote working directory. First, find all files 
+  # in manifest on local filesystem to be transferred. If cannot find 
+  # all files in manifest, then halt launch. However, if all files are 
+  # found on local filesystem, then compute md5sum of each file for 
+  # integrity checking. Once md5sum's are computed, begin serial file 
+  # transfers via scp/sftp. After each successful file transfer, check 
+  # file integrity on remote filesystem against previously computed
+  # md5sum's from local filesystem. Keep local checklist of successfully 
+  # transfered files in case launch is halted later on for another 
+  # reason. This will allow launch to restart from point of failure. If
+  # a file transfer from the local filesystem to the working directory 
+  # on the remote filesystem system fails, try file transfer once more. 
+  # If it fails again, then halt launch. 
+
+  # After file transfers are complete, check if a Singularity container
+  # will be utilized to run the jupyter-based workflow. If so, then 
+  # first search if the Singularity container is already available on the remote 
+  # filesystem. Check both 
+  # absolute paths and relative to remote working directory. If Singularity container is not found on remote
+
+#If container is found on local filesystem, then 
+  # compute md5sum for integrity check. Next, check if container exists also exists on 
+
+# If Singula
+
+# then start file transfer via scp/sftp.
+
+  
+
+  galyleo_output '* * * * * * * * * * * * * * * * * * * * * * * * * * * * *'
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo_help
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#
+# Returns:
+#   0
+#   1
+# ----------------------------------------------------------------------
+galyleo_help() {
+
+  galyleo_output "USAGE: galyleo.sh <command> [options] {values}"
+  galyleo_output ""
+  galyleo_output "Finish writing help ... ."
+
+  # remove help command. move to no command inputs; only command-line options with main turning into launch command.
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# main
+# 
+# Globals:
+#   @
+#
+# Arguments:
+#
+# Returns:
+#   0
+#   1
+# ----------------------------------------------------------------------
+main() {
+
+  local galyleo_command=''
+
+  if (( "${#}" > 0 )); then # at least one command-line arguments was 
+    # provided. The first argument is expected to be main command issued 
+    # by the user. Read in that command and then determine if it is a 
+    # valid command.
+
+    galyleo_command="${1}"
+    shift 1
+
+    if [[ "${galyleo_command}" = 'launch' ]]; then
+
+      galyleo_launch "${@}"
+      if [[ "${?}" -ne 0 ]]; then
+        galyleo_error 'galyleo launch failed.'
+        exit 1
+      fi
+
+    elif [[ "${galyleo_command}" = 'help' || \
+            "${galyleo_command}" = '-h' || \
+            "${galyleo_command}" = '--help' ]]; then 
+
+      galyleo_help "${@}"
+      if [[ "${?}" -ne 0 ]]; then
+        galyleo_error 'galyleo help failed.'
+        exit 1
+      fi
+
+    else
+
+      galyleo_error 'Command not recognized or not supported.'
+      exit 1
+
+    fi
+
+  else
+
+    galyleo_error 'No command-line arguments were provided.'
+    exit 1
+
+  fi
+
+  exit 0
+
+}
+# ----------------------------------------------------------------------
+
+main "${@}"
+
+# ======================================================================

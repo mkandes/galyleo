@@ -1,0 +1,476 @@
+#/usr/bin/env bash
+# ======================================================================
+#
+# NAME
+# 
+#     galyleo.sh
+#
+# DESCRIPTION
+#
+#     A bash script to help launch Jupyter notebooks on a remote system.
+#
+# USAGE
+#
+#     TBD
+#
+# AUTHOR
+#
+#     Marty Kandes, Ph.D.
+#     Computational & Data Science Research Specialist
+#     High-Performance Computing User Services Group
+#     San Diego Supercomputer Center
+#     University of California, San Diego
+#
+# LAST UPDATED
+#
+#     Saturday, March 6th, 2021
+#
+# ----------------------------------------------------------------------
+
+source lib/log.sh
+source lib/ssh.sh
+
+# ----------------------------------------------------------------------
+# galyleo::launch
+#
+#   Launches a Jupyter notebook server on a remote system.
+# 
+# Globals:
+#
+#   None
+#
+# Arguments:
+#
+# Returns:
+#
+#   True  (0) if launch was successful.
+#   False (1) if launch failed and/or was halted.
+#
+# ----------------------------------------------------------------------
+galyleo::launch() {
+
+  # Define local variables.
+  local remote_username
+  local remote_login_hostname
+  local ssh_private_key
+  local batch_scheduler_type
+  local batch_job_script
+  local batch_job_name
+  local batch_account
+  local batch_reservation
+  local batch_queue
+  local -i batch_nodes
+  local -i batch_cpus_per_node
+  local -i batch_cpu_memory
+  local -i batch_gpus_per_node
+  local batch_gpu_type
+  local batch_time_limit
+  local jupyter_interface
+  local jupyter_notebook_dir
+  local reverse_proxy
+  local files_to_transfer
+  local singularity_container
+
+  # Assign default values to local variables.
+  remote_username="${USER}"
+  remote_login_hostname='comet.sdsc.edu'
+  ssh_private_key='id_rsa'
+  batch_scheduler_type='slurm'
+  batch_job_script=''
+  batch_job_name=''
+  batch_account=''
+  batch_reservation=''
+  batch_queue='debug'
+  batch_nodes=1
+  batch_cpus_per_node=1
+  batch_cpu_memory='2G'
+  batch_gpus_per_node=0
+  batch_gpu_type=''
+  batch_time_limit='00:30:00'
+  jupyter_interface='lab'
+  jupyter_notebook_dir=''
+  reverse_proxy='comet-user-content.sdsc.edu'
+  files_to_transfer=''
+  singularity_container=''
+
+  # Read in command-line options and assign input variables to local variables.
+  while (("${#}" > 0)); do
+    case "${1}" in
+      -u | --username )
+        remote_username="${2}"
+        shift 2
+        ;;
+      -h | --hostname )
+        remote_login_hostname="${2}"
+        shift 2
+        ;;
+      -k | --key )
+        ssh_private_key="${2}"
+        shift 2
+        ;;
+      --scheduler-type )
+        batch_scheduler_type="${2}"
+        shift 2
+        ;;
+      -b | --batch-script )
+        batch_script="${2}"
+        shift 2
+        ;;
+      -j | --job-name )
+        batch_job_name="${2}"
+        shift 2
+        ;;
+      -a | --account )
+        batch_account="${2}"
+        shift 2
+        ;;
+      -r | --reservation )
+        batch_reservation="${2}"
+        shift 2
+        ;;
+      -q | --queue )
+        batch_queue="${2}"
+        shift 2
+        ;;
+      -n | --nodes )
+        batch_nodes="${2}"
+        shift 2
+        ;;
+      -c | --cpus-per-node )
+        batch_cpus_per_node="${2}"
+        shift 2
+        ;;
+      -m | --memory )
+        batch_cpu_memory="${2}"
+        shift 2
+        ;;
+      -g | --gpus-per-node )
+        batch_gpus_per_node="${2}"
+        shift 2
+        ;;
+      --gpu-type )
+        batch_gpu_type="${2}"
+        shift 2
+        ;;
+      -t | --time-limit )
+        batch_time_limit="${2}"
+        shift 2
+        ;;
+      -i | --interface )
+        jupyter_interface="${2}"
+        shift 2
+        ;;
+      -d | --directory )
+        jupyter_notebook_dir="${2}"
+        shift 2
+        ;;
+      --reverse-proxy )
+        jupyter_reverse_proxy="${2}"
+        shift 2
+        ;;
+      -f | --files )
+        files_to_transfer="${2}"
+        shift 2
+        ;;
+      -s | --singularity-container )
+        singularity_container="${2}"
+        shift 2
+        ;;
+      *)
+        log::error "Command-line option ${1} not recognized or not supported."
+        return 1
+    esac
+  done
+
+  # Print all command-line options read in for launch to standard output.
+  log::output 'Preparing galyleo for launch into Jupyter orbit ...'
+  log::output ''
+  log::output "  remote_username: ${remote_username}"
+  log::output "  remote_login_hostname: ${remote_login_hostname}"
+  log::output "  ssh_private_key: ${ssh_private_key}"
+  log::output "  batch_scheduler_type: ${batch_scheduler_type}"
+  log::output "  batch_job_script: ${batch_job_script}"
+  log::output "  batch_job_name: ${batch_job_name}"
+  log::output "  batch_account: ${batch_account}"
+  log::output "  batch_reservation: ${batch_reservation}"
+  log::output "  batch_queue: ${batch_queue}"
+  log::output "  batch_cpus_per_node: ${batch_cpus_per_node}"
+  log::output "  batch_cpu_memory: ${batch_cpu_memory}"
+  log::output "  batch_gpus_per_node: ${batch_gpus_per_node}"
+  log::output "  batch_gpu_type: ${batch_gpu_type}"
+  log::output "  batch_time_limit: ${batch_time_limit}"
+  log::output "  jupyter_interface: ${jupyter_interface}"
+  log::output "  jupyter_notebook_dir: ${jupyter_notebook_dir}"
+  log::output "  jupyter_reverse_proxy: ${jupyter_reverse_proxy}"
+  log::output "  files_to_transfer: ${files_to_transfer}"
+  log::output "  singularity_container: ${singularity_container}"
+  log::output ''
+
+  # TODO: Check permissions on the user's local ~/.ssh directory.
+
+  # Check if the user's SSH keypair exists. Require the use of SSH keys.
+  ssh::find_keys "${ssh_private_key}"
+  if [[ "${?}" -ne 0 ]]; then
+    # Failed to find the user's SSH keypair. Ask user if they would like
+    # galyleo to generate the keypair. Otherwise, halt launch.
+    log::warning 'Failed to find the SSH keypair.'
+    read -p "Would you like galyleo to generate the SSH keypair? [y/n]: " -n 1 -r
+    if [[ ! "${REPLY}" =~ ^[Yy]$ ]]; then
+       # Do not generate keypair. Do not pass go. Halt launch.
+       log::error 'Use of SSH keys is required.'
+       return 1
+    else
+       ssh::generate_keys "${ssh_private_key}"
+       if [[ "${?}" -ne 0 ]]; then
+          # Failed to generate SSH keypair. Halt launch. 
+          log::error 'Use of SSH keys is required.'
+          return 1
+       fi
+    fi
+  fi
+  log::output ''
+
+  # Check if the user's private SSH key is protected with a passphrase.
+  # Require the use of an SSH passphrase.
+  ssh::private_key_protected "${ssh_private_key}"
+  if [[ "${?}" -ne 0 ]]; then
+    # Private SSH key is not protected by a passphrase. Halt launch.
+    log::error 'Private SSH key must be secured by a passphrase.'
+    return 1
+  fi
+  log::output ''
+
+  # Check if the user's SSH keypair can be used to authenticate to the
+  # remote login host.
+  log::output "Attempting to authenticate to ${remote_login_hostname} ..."
+  ssh::execute_command "${ssh_private_key}" \
+                       "${remote_username}" \
+                       "${remote_login_hostname}" \
+                       'hostname'
+  if [[ "${?}" -ne 0 ]]; then
+    # Authentication failed. Attempt to authorize the user's public SSH
+    # key on the remote login host via SSH password authentication.
+    ssh::authorize_public_key "${ssh_private_key}" \
+                              "${remote_username}" \
+                              "${remote_login_hostname}"
+    if [[ "${?}" -eq 0 ]]; then
+      # Public SSH key should now be authorized on the remote login host.
+      # Re-check if SSH keypair can authentication to the remote login host.
+      ssh::execute_command "${ssh_private_key}" \
+                           "${remote_username}" \
+                           "${remote_login_hostname}" \
+                           'hostname'
+      if [[ "${?}" -ne 0 ]]; then
+        # Authentication failed again. Halt launch.
+        log::error 'SSH public key authentication is required.'
+        return 1
+      fi
+    else
+      # Failed to authorize the user's public SSH key on the remote
+      # login host. Halt launch.
+      log::error 'Public SSH key must be authorized on the remote login host.'
+      return 1
+    fi
+  else
+    log::output 'SSH keypair was used to authenticate to the remote login host successfully.'
+  fi
+  log::output ''
+
+  # Check if the ~/.galyleo directory exists in the user's HOME 
+  # directory on the remote login host. If the directory does not exist,
+  # then create it.
+  ssh::mkdir "${ssh_private_key}" \
+             "${remote_username}" \
+	     "${remote_login_hostname}" \
+	     "/home/${remote_username}/.galyleo"
+  log::output ''
+
+  # Check if the user specified a working directory for the Jupyter
+  # notebook on the remote system. If the user did not specify one, then
+  # set the working directory of the Jupyter notebook to be the user's 
+  # HOME directory on the remote login host.
+  log::output 'Checking if a working directory for the Jupyter notebook was specified ...'
+  if [[ -z "${jupyter_notebook_dir}" ]]; then
+    # User did not specify a working directory. Set working directory to
+    # be the user's HOME directory on the remote login host. 
+    log::warning 'No working directory on the remote system was specifed.'
+    log::output 'Setting the working directory to your HOME directory on the remote login host ...'
+    jupyter_notebook_dir="/home/${remote_username}"
+  fi
+  log::output "Working directory for the Jupyter notebook: ${jupyter_notebook_dir}"
+  log::output ''
+
+  # TODO: Rework this check for an existing working directory on the 
+  # remote login host. We likely only want to create the directory if 
+  # files are also being uploaded. For example, why would one launch 
+  # their Jupyter notebook into a new directory? The notebook itself
+  # would need to be moved into this directory. i.e., The user would
+  # need to upload the notebook file to the newly created directory.
+  #
+  # For now, assume all files already exist on the remote system.
+  #
+  # Check if the working directory for the Jupyter notebook already
+  # exists on the remote (shared) filesystem. If it does not exist, then
+  # create it.
+  #ssh::mkdir "${ssh_private_key}" \
+  #	     "${remote_username}" \
+  #           "${remote_login_hostname}" \
+  #           "${jupyter_notebook_dir}"
+  #log::output ''
+
+
+  # TODO: Add this feature to allow files to be uploaded later. Some 
+  #       aspects of the current implementation are not yet complete.
+  #
+  # If remote working directory exists, attempt to upload files to be
+  # transferred to the remote working directory. First, find all files
+  # in manifest on local filesystem to be transferred. If cannot find
+  # all files in manifest, then halt launch. However, if all files are
+  # found on local filesystem, then compute md5sum of each file for
+  # integrity checking. Once md5sum's are computed, begin serial file
+  # transfers via scp/sftp. After each successful file transfer, check
+  # file integrity on remote filesystem against previously computed
+  # md5sum's from local filesystem. Keep local checklist of successfully
+  # transfered files in case launch is halted later on for another
+  # reason. This will allow launch to restart from point of failure. If
+  # a file transfer from the local filesystem to the working directory
+  # on the remote filesystem system fails, try file transfer once more.
+  # If it fails again, then halt launch.
+  #
+  # * Need to add support for multiple OS. e.g., md5sum is not the default 
+  #   command for Mac OS X. It's md5, which appears to be the BSD-style 
+  #   command.
+  #
+  #ssh::transfer_files "${ssh_private_key}" \
+  #	              "${remote_username}" \
+  #	              "${remote_login_hostname}" \
+  #		      "${jupyter_notebook_dir}" \
+  #		      "${files_to_transfer}"
+  # log::output ''
+
+  # TODO: Complete Singularity container support.
+  #
+  # After file transfers are complete, check if a Singularity container
+  # will be utilized to run the jupyter-based workflow. If so, then
+  # first search if the Singularity container is already available on the remote
+  # filesystem. Check both absolute and relative paths to remote working
+  # directory. If Singularity container is not found on remote, then 
+  # search for it on local filesystem. If the container is found on 
+  # local filesystem, then compute md5sum for integrity check. Next, 
+  # check if container exists also exists on ...
+
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo::help
+#
+#  Provides information to help users run galyleo.
+# 
+# Globals:
+#   None
+#
+# Arguments:
+#
+# Returns:
+#   True  (0) if
+#   False (1) if 
+# ----------------------------------------------------------------------
+galyleo::help() {
+
+  log::output 'USAGE: galyleo.sh <command> [options] {values}'
+  log::output ''
+  log::output 'Finish writing help ... .'
+
+#echo "Usage: $0 [-p <string>] [-d <string>] [-A <string>] [-b <string>] [-t time] [-s 'notebook' | 'jupyterlab'] [-i <string>] [-I]" 1>&2;
+#    echo -e "-p: the partition to use, debug or compute. Default is compute" 1>&2;
+#    echo -e "-d: the top-level directory of your jupyter notebook. Default is /home/$USER" 1>&2;
+#    echo -e "-A: the project allocation to be used for this notebook. Default is system default (also called project or group)" 1>&2;
+#    echo -e "-b: the batch script you want to submit. Only those in the batch folder are supported. Default is ./batch/batch_notebook.sh" 1>&2;
+#    echo -e "-s: Choose between 'notebook' and 'jupyterlab'" 1>&2;
+#    echo -e "-g: Number of gpus to use for gpu shared partitions" 1>&2;
+#    echo -e "-i: Choose a singularity container to start your notebook in." 1>&2;
+#    echo -e "-I: Get extra information about the job you submitted using the script" 1>&2;
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# galyleo::main
+#
+#   Controls the execution of galyleo.
+# 
+# Globals:
+#
+#   @
+#
+# Arguments:
+#
+#   @
+#
+# Returns:
+#
+#   True  (0) if galyleo executed successfully without issue.
+#   False (1) if galyleo failed to execute properly.
+#
+# ----------------------------------------------------------------------
+galyleo::main() {
+
+  # Define local variables.
+  local galyleo_command
+
+  # If at least one command-line argument was provided by the user, 
+  # start parsing the command-line arguments. Otherwise, throw an error.
+  if (( "${#}" > 0 )); then 
+
+    # Read in the first command-line argument, which is expected to be
+    # the main command issued by the user.
+    galyleo_command="${1}"
+    shift 1
+
+    # Determine if the command provided by user is a valid. If it is a 
+    # valid command, then execute that command. Otherwise, throw an error.
+    if [[ "${galyleo_command}" = 'launch' ]]; then
+
+      galyleo::launch "${@}"
+      if [[ "${?}" -ne 0 ]]; then
+        log::error 'galyleo::launch failed.'
+        exit 1
+      fi
+
+    elif [[ "${galyleo_command}" = 'help' || \
+            "${galyleo_command}" = '-h' || \
+            "${galyleo_command}" = '--help' ]]; then
+
+      galyleo::help "${@}"
+      if [[ "${?}" -ne 0 ]]; then
+        log::error 'galyleo::help failed.'
+        exit 1
+      fi
+
+    else
+
+      log::error 'Command not recognized or not supported.'
+      exit 1
+
+    fi
+
+  else
+
+    log::error 'No command-line arguments were provided.'
+    exit 1
+
+  fi
+
+  exit 0
+
+}
+
+# ----------------------------------------------------------------------
+
+galyleo::main "${@}"
+
+# ======================================================================

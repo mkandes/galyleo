@@ -1,0 +1,367 @@
+#!/usr/bin/env bash
+# ======================================================================
+#
+# NAME
+#
+#     ssh.sh
+#
+# DESCRIPTION
+#
+#     A library of bash functions for performing SSH-related tasks.
+#
+# USAGE
+#
+#     If you would like to use this library in your own bash script, 
+#     then you'll need to source it from your bash script.
+#
+#         source ssh.sh
+#
+#     Once the library has been sourced, you can call functions from the 
+#     library in your own bash script.
+#
+# AUTHOR
+#
+#     Marty Kandes, Ph.D.
+#     Computational & Data Science Research Specialist
+#     High-Performance Computing User Services Group
+#     San Diego Supercomputer Center
+#     University of California, San Diego
+#
+# LAST UPDATED
+#
+#     Thursday, September 26th, 2019
+#
+# ----------------------------------------------------------------------
+
+source log.sh
+
+# ----------------------------------------------------------------------
+# ssh::authenticate_client
+# 
+#   Authenticates the SSH client against the SSH server on the remote
+#   host to confirm if an SSH keypair is authorized to establish an SSH
+#   connection with the remote host.
+#
+# Globals:
+#
+#   None
+#
+# Arguments:
+#
+#   remote_username
+#   remote_hostname
+#   ssh_private_key
+#
+# Returns:
+#
+#   True (0) if the ssh_private_key + ssh_public_key pair can
+#     authenticate to remote_hostname as remote_username.
+#
+#   False (1) if ssh_private_key + ssh_public_key pair cannot 
+#     authenticate to remote_hostname as remote_username.
+#
+# ----------------------------------------------------------------------
+ssh::authenticate_client() {
+
+  # Define local variables.
+  local remote_username
+  local remote_hostname
+  local ssh_private_key
+  local ssh_public_key
+
+  # Read in input variables and assign to local variables.
+  remote_username="${1}"
+  remote_hostname="${2}"
+  ssh_private_key="${HOME}/.ssh/${3}"
+  ssh_public_key="${ssh_private_key}.pub"
+
+  # Check if SSH keypair can authenticate with remote host.
+  log::output "Authenticating to remote host ${remote_hostname} ..."
+  log::output "  ssh -i ${ssh_private_key} ${remote_username}@${remote_hostname} touch ~/.ssh"
+  ssh -i "${ssh_private_key}" \
+      -o IdentitiesOnly=yes \
+      -o PasswordAuthentication=no \
+      -o PubkeyAuthentication=yes \
+      -o PreferredAuthentications=publickey \
+         "${remote_username}@${remote_hostname}" \
+         "touch ~/.ssh"
+  if [[ "${?}" -ne 0 ]]; then
+    log::warning 'SSH public key authentication failed.'
+    return 1
+  fi
+
+  # If ssh command succeeded, then SSH keypair authenticated with 
+  # remote host successfully.
+  log::output 'SSH public key authentication succeeded.'
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# ssh::authorize_public_key
+#
+#   Authorizes the user's public SSH key on the remote host via password
+#   authentication.
+#
+# Globals:
+#
+#   None
+#
+# Augments:
+#
+#   remote_username
+#   remote_hostname
+#   ssh_private_key
+#
+# Returns:
+#
+#   True (0) if ssh-copy-id command succeeds.
+#
+#   False (1) if ssh-copy-id command fails.
+#
+# ----------------------------------------------------------------------
+ssh:authorize_public_key() {
+
+  # Define local variables.
+  local remote_username
+  local remote_hostname
+  local ssh_private_key
+  local ssh_public_key
+
+  # Read in input variables and assign to local variables.
+  remote_username="${1}"
+  remote_hostname="${2}"
+  ssh_private_key="${HOME}/.ssh/${3}"
+  ssh_public_key="${ssh_private_key}.pub"
+
+  # Copy public SSH key to authorized_keys file on remote host.
+  galyleo_output "Authorizing public SSH key ${ssh_public_key} on remote host ${remote_hostname} ..."
+  galyleo_output "  ssh-copy-id -i ${ssh_private_key} ${remote_username}@${remote_hostname}"
+  ssh-copy-id -i "${ssh_private_key}" \
+              -o PasswordAuthentication=yes \
+              -o PubkeyAuthentication=no \
+              -o PreferredAuthentications=password \
+                 "${remote_username}@${remote_hostname}"
+  if [[ "${?}" -ne 0 ]]; then
+    log::error "Authorization of public SSH key ${ssh_public_key} on remote host ${remote_hostname} failed."
+    return 1
+  fi
+
+  # If ssh-copy-id command succeeded, then public SSH key should have 
+  # been written to ~/.ssh/authorized_keys file on remote host.
+  log::output "Authorization of public SSH key ${ssh_public_key} on remote host ${remote_hostname} succeeded."
+  return 0
+}
+
+# ----------------------------------------------------------------------
+# ssh::remote_command
+#
+#   Issues a command on a remote host via SSH.
+#
+# Globals:
+#
+#   None
+#
+# Arguments:
+#
+#   ssh_private_key
+#   remote_username
+#   remote_hostname
+#   remote_command
+#
+# Returns:
+#
+#   True (0) if remote_command ran successfully on remote_host.
+#
+#   False (1) if remote_command failed to run on remote_host and/or
+#     returned a non-zero exit code.
+#
+# ----------------------------------------------------------------------
+ssh::remote_command() {
+
+  # Define local variables.
+  local ssh_private_key
+  local ssh_public_key
+  local remote_username
+  local remote_hostname
+  local remote_command
+
+  # Read in input variables and assign to local variables.
+  ssh_private_key="${HOME}/.ssh/${1}"
+  ssh_public_key="${ssh_private_key}.pub"
+  remote_username="${2}"
+  remote_hostname="${3}"
+  remote_command="${4}"
+
+  # Run command on remote host.
+  log::output 'Issuing command to remote host ...'
+  log::output "  ssh -i ${ssh_private_key} ${remote_username}@${remote_hostname} ${remote_command}"
+  ssh -i "${ssh_private_key}" \
+      -o IdentitiesOnly=yes \
+      -o PasswordAuthentication=no \
+      -o PubkeyAuthentication=yes \
+      -o PreferredAuthentications=publickey \
+         "${remote_username}@${remote_hostname} ${remote_command}"
+  if [[ "${?}" -ne 0 ]]; then
+    log::warning 'Command failed to run on remote host and/or returned a non-zero exit code.'
+    return 1
+  fi
+
+  # Command ran successfully on remote host. Do not return confirmation
+  # message in order to avoid interferrence with standard output 
+  # associated with command issued on remote host.
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# ssh::find_keys
+# 
+#   Checks if an SSH keypair exists.
+#
+# Globals:
+#
+#   None
+#
+# Arguments:
+#
+#   ssh_private_key
+#
+# Returns:
+#
+#   True (0) if ssh_private_key and ssh_public_key are found.
+#
+#   False (1) if ssh_private_key and ssh_public_key are not found.
+#
+# ----------------------------------------------------------------------
+ssh::find_keys() {
+
+  # Declare local variables.
+  local ssh_private_key
+  local ssh_public_key
+
+  # Read in input variables and assign to local variables.
+  ssh_private_key="${HOME}/.ssh/${1}"
+  ssh_public_key="${ssh_private_key}.pub"
+
+  # Check if private SSH key exists.
+  log::output "Checking if private SSH key ${ssh_private_key} exists ..."
+  if [[ ! -f "${ssh_private_key}" ]]; then
+    log::error "Private SSH key ${ssh_private_key} not found."
+    return 1
+  else
+    log::output "Private SSH key ${ssh_private_key} found."
+  fi
+
+  # Check if public SSH key exists.
+  log::output "Checking if public SSH key ${ssh_public_key} exists ..."
+  if [[ ! -f "${ssh_public_key}" ]]; then
+    log::error "Public SSH key ${ssh_public_key} not found."
+    return 1
+  else
+    log::output "Public SSH key ${ssh_public_key} found."
+  fi
+
+  # If both private and public SSH keys are found, then keypair exists.
+  log::output "SSH keypair exists."
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# ssh::generate_keys
+#
+#   Generates a new SSH keypair.
+#
+# Globals:
+#
+#   None
+#
+# Arguments:
+#
+#   ssh_private_key
+#
+# Returns:
+# 
+#   True (0) if ssh-keygen command succeeds.
+#
+#   False (1) if ssh-keygen command fails.
+#
+# ----------------------------------------------------------------------
+ssh:generate_keys() {
+
+  # Declare local variables.
+  local ssh_private_key
+  local ssh_public_key
+
+  # Read in input variables and assign to local variables.
+  ssh_private_key="${HOME}/.ssh/${1}"
+  ssh_public_key="${ssh_private_key}.pub"
+
+  # Generate new SSH keypair.
+  log::output 'Generating a new SSH keypair ...'
+  log::output "  ssh-keygen -t rsa -f ${ssh_private_key}"
+  # Future ssh-keygen command once Comet updates to CentOS 7 / OpenSSH 6.5+?
+  #   ssh-keygen -o -t rsa -a 100 -b 4096 -f "${HOME}/.ssh/${key}"
+  ssh-keygen -t rsa -f ${ssh_private_key}
+  if [[ "${?}" -ne 0 ]]; then
+    log::error 'Keypair generation failed.'
+    return 1
+  fi
+
+  # If ssh-keygen command succeeded, then a new SSH keypair should have 
+  # been generated in ${HOME}/.ssh.
+  log::output 'Keypair generation completed successfully.'
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
+# ssh::private_key_protected
+# 
+#   Checks if a private SSH key is protected by a passphrase by 
+#   attempting to change it.
+#
+# Globals:
+#
+#   None
+#
+# Arguments:
+#
+#   ssh_private_key
+#
+# Returns:
+# 
+#   True (0) if ssh_private_key is protected by passphrase.
+#
+#   False (1) if ssh_private_key is not protected by passphrase.
+#
+# ----------------------------------------------------------------------
+ssh::private_key_protected() {
+
+  # Define local variables.
+  local ssh_private_key
+
+  # Read in input variables and assign to local variables.
+  ssh_private_key="${HOME}/.ssh/${1}"
+
+  # Check if private SSH key is protected by a passphrase.
+  log::output "Checking if private SSH key ${ssh_private_key} is protected by a passphrase ..."
+  log::output "Attempting to change passphrase on private SSH key ${ssh_private_key} ..."
+  log::output "  ssh-keygen -p -P '' -N '' -f ${ssh_private_key}"
+  ssh-keygen -p -P '' -N '' -f "${ssh_private_key}"
+  if [[ "${?}" -eq 0 ]]; then
+    log::warning 'Passphrase changed succeeded!'
+    log::error "Private SSH key ${ssh_private_key} is not protected by a passphrase."
+    return 1
+  fi
+
+  # If the passphrase change failed, then the private SSH key is 
+  # protected by a passphrase.
+  log::output 'Passphrase changed failed.'
+  log::output "Private SSH key ${ssh_private_key} is protected by a passphrase."
+  return 0
+
+}
+
+# ======================================================================
