@@ -14,6 +14,10 @@
 #
 #     <INSERT USAGE DESCRIPTION HERE>
 #
+# DEPENDENCIES
+#
+#     <INSERT DEPS DESCRIPTION HERE>
+#
 # AUTHOR(S)
 #
 #     Marty Kandes, Ph.D.
@@ -33,7 +37,7 @@ declare -xr  CURRENT_LOCAL_TIME="$(date +'%Y%m%dT%H%M%S%z')"
 declare -xir CURRENT_UNIX_TIME="$(date +'%s')"
 declare -xir RANDOM_ID="${RANDOM}"
 
-source "${GALYLEO_ROOT_DIR}/lib/log.sh"
+source "${GALYLEO_ROOT_DIR}/lib/slog.sh"
 
 # ----------------------------------------------------------------------
 # galyleo_launch
@@ -59,7 +63,7 @@ source "${GALYLEO_ROOT_DIR}/lib/log.sh"
 function galyleo_launch() {
 
   # Define local input variables.
-  local -i log_level
+  local -i slog_level
   local launch_mode
   local username
   local hostname
@@ -92,7 +96,7 @@ function galyleo_launch() {
   local -i slurm_job_id
 
   # Assign default values to local input variables.
-  log_level=1 # Standard logging level. Set log_level=0 for quiet mode.
+  slog_level=1 # Standard logging level. Set slog_level=0 for quiet mode.
   launch_mode='local' # or remote (via ssh)
   username="${USER}"
   hostname='login.expanse.sdsc.edu'
@@ -131,7 +135,7 @@ function galyleo_launch() {
   while (("${#}" > 0)); do
     case "${1}" in
       -l | --log-level )
-        log_level="${2}"
+        slog_level="${2}"
         shift 2
         ;;
       -M | --mode )
@@ -231,49 +235,49 @@ function galyleo_launch() {
         shift 2
         ;;
       *)
-        log_error "${log_level}" "Command-line option ${1} not recognized or not supported."
+        slog_error "${slog_level}" "Command-line option ${1} not recognized or not supported."
         return 1
     esac
   done
 
   # Print all command-line options read in for launch to standard output.
-  log_output "${log_level}" 'Preparing galyleo for launch into Jupyter orbit ...'
-  log_output "${log_level}" ''
-  log_output "${log_level}" 'Listing all launch parameters ...'
-  log_output "${log_level}" '  command-line option     : value'
-  log_output "${log_level}" "    -l | --log-level      : ${log_level}"
-  log_output "${log_level}" "    -M | --mode           : ${launch_mode}"
-  log_output "${log_level}" "    -u | --username       : ${username}"
-  log_output "${log_level}" "    -h | --hostname       : ${hostname}"
-  log_output "${log_level}" "    -k | --key            : ${private_key}"
-  log_output "${log_level}" "    -S | --scheduler      : ${scheduler}"
-  log_output "${log_level}" "    -b | --script         : ${script}"
-  log_output "${log_level}" "    -a | --account        : ${account}"
-  log_output "${log_level}" "    -r | --reservation    : ${reservation}"
-  log_output "${log_level}" "    -q | --queue          : ${queue}"
-  log_output "${log_level}" "    -n | --nodes          : ${nodes}"
-  log_output "${log_level}" "    -c | --cpus-per-node  : ${cpus_per_node}"
-  log_output "${log_level}" "    -m | --memory-per-cpu : ${memory_per_cpu}"
-  log_output "${log_level}" "    -g | --gpus-per-node  : ${gpus_per_node}"
-  log_output "${log_level}" "    -G | --gpus           : ${gpus}"
-  log_output "${log_level}" "       | --gres           : ${gres}"
-  log_output "${log_level}" "    -t | --time-limit     : ${time_limit}"
-  log_output "${log_level}" "    -j | --jupyter      : ${jupyter_interface}"
-  log_output "${log_level}" "    -d | --directory      : ${jupyter_notebook_dir}"
-  log_output "${log_level}" "    -p | --proxy          : ${reverse_proxy_fqdn}"
-  log_output "${log_level}" "    -D | --dns-domain     : ${dns_domain}"
-  log_output "${log_level}" "    -s | --sif            : ${singularity_container}"
-  log_output "${log_level}" "    -e | --env-modules    : ${env_modules}"
-  log_output "${log_level}" "       | --conda-env      : ${conda_env}"
-  log_output "${log_level}" "    -f | --files          : ${files_to_transfer}"
-  log_output "${log_level}" ''
+  slog_output "${slog_level}" 'Preparing galyleo for launch into Jupyter orbit ...'
+  slog_output "${slog_level}" ''
+  slog_output "${slog_level}" 'Listing all launch parameters ...'
+  slog_output "${slog_level}" '  command-line option     : value'
+  slog_output "${slog_level}" "    -l | --log-level      : ${slog_level}"
+  slog_output "${slog_level}" "    -M | --mode           : ${launch_mode}"
+  slog_output "${slog_level}" "    -u | --username       : ${username}"
+  slog_output "${slog_level}" "    -h | --hostname       : ${hostname}"
+  slog_output "${slog_level}" "    -k | --key            : ${private_key}"
+  slog_output "${slog_level}" "    -S | --scheduler      : ${scheduler}"
+  slog_output "${slog_level}" "    -b | --script         : ${script}"
+  slog_output "${slog_level}" "    -a | --account        : ${account}"
+  slog_output "${slog_level}" "    -r | --reservation    : ${reservation}"
+  slog_output "${slog_level}" "    -q | --queue          : ${queue}"
+  slog_output "${slog_level}" "    -n | --nodes          : ${nodes}"
+  slog_output "${slog_level}" "    -c | --cpus-per-node  : ${cpus_per_node}"
+  slog_output "${slog_level}" "    -m | --memory-per-cpu : ${memory_per_cpu}"
+  slog_output "${slog_level}" "    -g | --gpus-per-node  : ${gpus_per_node}"
+  slog_output "${slog_level}" "    -G | --gpus           : ${gpus}"
+  slog_output "${slog_level}" "       | --gres           : ${gres}"
+  slog_output "${slog_level}" "    -t | --time-limit     : ${time_limit}"
+  slog_output "${slog_level}" "    -j | --jupyter      : ${jupyter_interface}"
+  slog_output "${slog_level}" "    -d | --directory      : ${jupyter_notebook_dir}"
+  slog_output "${slog_level}" "    -p | --proxy          : ${reverse_proxy_fqdn}"
+  slog_output "${slog_level}" "    -D | --dns-domain     : ${dns_domain}"
+  slog_output "${slog_level}" "    -s | --sif            : ${singularity_container}"
+  slog_output "${slog_level}" "    -e | --env-modules    : ${env_modules}"
+  slog_output "${slog_level}" "       | --conda-env      : ${conda_env}"
+  slog_output "${slog_level}" "    -f | --files          : ${files_to_transfer}"
+  slog_output "${slog_level}" ''
 
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
   http_response="$(curl -s -w %{http_code} https://manage.${reverse_proxy_fqdn}/getlink.cgi -o -)"
   http_status_code="$(echo ${http_response} | awk '{print $NF}')"
   if (( "${http_status_code}" != 200 )); then
-    log_error "${log_level}" "Unable to connect to the reverse proxy service: ${http_status_code}"
+    slog_error "${slog_level}" "Unable to connect to the reverse proxy service: ${http_status_code}"
     return 1
   fi
 
@@ -297,9 +301,9 @@ function galyleo_launch() {
   cd "${jupyter_notebook_dir}"
   if [[ "${?}" -ne 0 ]]; then
     if [[ ! -d "${jupyter_notebook_dir}" ]]; then 
-      log_error "${log_level}" "Jupyter notebook directory does not exist. Cannot change directory."
+      slog_error "${slog_level}" "Jupyter notebook directory does not exist. Cannot change directory."
     else
-      log_error "${log_level}" "Unable to change directory to the Jupyter notebook directory." 
+      slog_error "${slog_level}" "Unable to change directory to the Jupyter notebook directory." 
     fi 
     return 1 
   fi
@@ -310,7 +314,7 @@ function galyleo_launch() {
   declare -xr JUPYTER_TOKEN="$(openssl rand -hex 16)"
 
   # Generate a Jupyter launch script.
-  log_output "${log_level}" 'Generating Jupyter launch script ...'
+  slog_output "${slog_level}" 'Generating Jupyter launch script ...'
   if [[ ! -f "${jupyter_launch_script}" ]]; then
 
     echo '#!/usr/bin/env sh' > "${jupyter_launch_script}"
@@ -320,7 +324,7 @@ function galyleo_launch() {
     if [[ -n "${account}" ]]; then
       echo "#SBATCH --account=${account}" >> "${jupyter_launch_script}"
     else
-      log_error "${log_level}" 'No account specified. You must specify an account to charge the job against.'
+      slog_error "${slog_level}" 'No account specified. You must specify an account to charge the job against.'
       rm "${jupyter_launch_script}"
       return 1
     fi
@@ -401,14 +405,14 @@ function galyleo_launch() {
     echo 'wait' >> "${jupyter_launch_script}"
 
   else
-    log_error "${log_level}" 'Jupyter launch script already exists. Cannot overwrite.'
+    slog_error "${slog_level}" 'Jupyter launch script already exists. Cannot overwrite.'
     return 1
   fi
 
   # Launch Jupyter.
   slurm_job_id="$(sbatch ${jupyter_launch_script} | grep -o '[[:digit:]]*')"
   if [[ "${?}" -ne 0 ]]; then
-    log_error "${log_level}" 'Failed job submission to Slurm.'
+    slog_error "${slog_level}" 'Failed job submission to Slurm.'
     return 1
   fi
 
@@ -442,12 +446,12 @@ function galyleo_launch() {
 function galyleo_help() {
 
   # Define local variables.
-  local -i log_level
+  local -i slog_level
 
   # Assign default values to local variables.
-  log_level=1 # Standard logging level. Set log_level=0 for quiet mode.
+  slog_level=1 # Standard logging level. Set slog_level=0 for quiet mode.
 
-  log_output "${log_level}" 'USAGE: galyleo.sh <command> [options] {values}'
+  slog_output "${slog_level}" 'USAGE: galyleo.sh <command> [options] {values}'
 
   return 0
 
@@ -475,11 +479,11 @@ function galyleo_help() {
 function galyleo() {
 
   # Define local variables.
-  local -i log_level
+  local -i slog_level
   local galyleo_command
 
   # Assign default values to local variables.
-  log_level=1 # Standard logging level. Set log_level=0 for quiet mode.
+  slog_level=1 # Standard logging level. Set slog_level=0 for quiet mode.
 
   # If at least one command-line argument was provided by the user, then
   # start parsing the command-line arguments. Otherwise, throw an error.
@@ -496,7 +500,7 @@ function galyleo() {
 
       galyleo_launch "${@}"
       if [[ "${?}" -ne 0 ]]; then
-        log_error "${log_level}" 'galyleo_launch failed.'
+        slog_error "${slog_level}" 'galyleo_launch failed.'
         exit 1
       fi
 
@@ -506,20 +510,20 @@ function galyleo() {
 
       galyleo_help
       if [[ "${?}" -ne 0 ]]; then
-        log_error "${log_level}" 'galyleo_help failed.'
+        slog_error "${slog_level}" 'galyleo_help failed.'
         exit 1
       fi
     
     else
     
-      log_error "${log_level}" 'Command not recognized or not supported.'
+      slog_error "${slog_level}" 'Command not recognized or not supported.'
       exit 1
 
     fi
 
   else
 
-    log_error "${log_level}" 'No command-line arguments were provided.'
+    slog_error "${slog_level}" 'No command-line arguments were provided.'
     exit 1
 
   fi
