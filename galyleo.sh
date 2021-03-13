@@ -24,17 +24,16 @@
 #
 # LAST UPDATED
 #
-#     Friday, March 12th, 2021
+#     Saturday, March 13th, 2021
 #
 # ----------------------------------------------------------------------
 
+declare -xr  GALYLEO_ROOT_DIR="${PWD}"
 declare -xr  CURRENT_LOCAL_TIME="$(date +'%Y%m%dT%H%M%S%z')"
 declare -xir CURRENT_UNIX_TIME="$(date +'%s')"
 declare -xir RANDOM_ID="${RANDOM}"
-declare -xir LOWEST_EPHEMERAL_PORT=49152
-declare -xir HIGHEST_EPHEMERAL_PORT=65535
 
-source log.sh
+source "${GALYLEO_ROOT_DIR}/lib/log.sh"
 
 # ----------------------------------------------------------------------
 # galyleo_launch
@@ -455,7 +454,7 @@ function galyleo_help() {
 }
 
 # ----------------------------------------------------------------------
-# galyleo_main
+# galyleo
 #
 #   Controls the execution of galyleo.
 #
@@ -473,7 +472,7 @@ function galyleo_help() {
 #   False (1) if galyleo failed to execute properly.
 #
 # ----------------------------------------------------------------------
-function galyleo_main() {
+function galyleo() {
 
   # Define local variables.
   local -i log_level
@@ -531,6 +530,6 @@ function galyleo_main() {
 
 # ----------------------------------------------------------------------
 
-galyleo_main "${@}"
+galyleo "${@}"
 
 # ======================================================================
