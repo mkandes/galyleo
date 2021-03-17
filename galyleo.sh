@@ -28,7 +28,7 @@
 #
 # LAST UPDATED
 #
-#     Tuesday, March 16th, 2021
+#     Wednesday, March 17th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -115,7 +115,7 @@ function galyleo_launch() {
   local -i nodes=1
   local -i ntasks_per_node=1
   local -i cpus_per_task=1
-  local -i memory_per_node=0
+  local -i memory_per_node=-1
   local -i memory_per_cpu=2
   local gpus=''
   local gres=''
@@ -134,7 +134,7 @@ function galyleo_launch() {
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
-  local singularity_bind_mounts='/expanse,/scratch'
+  local singularity_bind_mounts=''
   local singularity_gpu_type=''
 
   # Declare input variables associated with environment modules.
@@ -248,6 +248,10 @@ function galyleo_launch() {
       --conda-env )
         conda_env="${2}"
         shift 2
+        ;;
+      -Q | --quiet )
+        SLOG_LEVEL=0
+        shift 1
         ;;
       *)
         slog error -m "Command-line option ${1} not recognized or not supported."

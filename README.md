@@ -33,8 +33,8 @@ University of California, San Diego
 
 ## Version
 
-0.1.0
+0.1.1
 
 ## Last Updated
 
-Tuesday, March 16th, 2021
+Wednesday, March 17th, 2021
