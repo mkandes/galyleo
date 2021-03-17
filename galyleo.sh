@@ -474,6 +474,32 @@ function galyleo_launch() {
 }
 
 # ----------------------------------------------------------------------
+# galyleo_clean
+#
+#   Clean up GALYLEO_CACHE_DIR. 
+#
+# Globals:
+#
+#   None
+#
+# Arguments:
+#
+#   None
+#
+# Returns:
+#
+#   True (0) always.
+#
+# ----------------------------------------------------------------------
+function galyleo_clean() {
+
+  rm -r "${GALYLEO_CACHE_DIR}"
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
 # galyleo_help
 #
 #   Provides usage information to help users run galyleo.
@@ -491,10 +517,34 @@ function galyleo_launch() {
 #   True (0) always.
 #
 # ----------------------------------------------------------------------
-
 function galyleo_help() {
 
-  slog output -m 'USAGE: galyleo.sh <command> [options] {values}'
+  slog output -m 'USAGE: galyleo.sh launch [command-line option] {value}'
+  slog output -m ''
+  slog output -m '  command-line option      : value'
+  slog output -m ''
+  slog output -m "    -A | --account         : ${account}"
+  slog output -m "    -R | --reservation     : ${reservation}"
+  slog output -m "    -p | --partition       : ${partition}"
+  slog output -m "    -q | --qos             : ${qos}"
+  slog output -m "    -N | --nodes           : ${nodes}"
+  slog output -m "    -n | --ntasks-per-node : ${ntasks_per_node}"
+  slog output -m "    -c | --cpus-per-task   : ${cpus_per_task}"
+  slog output -m "    -M | --memory-per-node : ${memory_per_node}"
+  slog output -m "    -m | --memory-per-cpu  : ${memory_per_cpu}"
+  slog output -m "    -G | --gpus            : ${gpus}"
+  slog output -m "       | --gres            : ${gres}"
+  slog output -m "    -t | --time-limit      : ${time_limit}"
+  slog output -m "    -j | --jupyter         : ${jupyter_interface}"
+  slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
+  slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
+  slog output -m "    -D | --dns-domain      : ${dns_domain}"
+  slog output -m "    -s | --sif             : ${singularity_image_file}"
+  slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
+  slog output -m "       | --nv              : ${singularity_gpu_type}"
+  slog output -m "    -e | --env-modules     : ${env_modules}"
+  slog output -m "       | --conda-env       : ${conda_env}"
+  slog output -m ''
 
   return 0
 
@@ -544,6 +594,14 @@ function galyleo() {
       galyleo_launch "${@}"
       if [[ "${?}" -ne 0 ]]; then
         slog error -m 'galyleo_launch command failed.'
+        exit 1
+      fi
+
+    elif [[ "${galyleo_command}" = 'clean' ]]; then
+    
+      galyleo_clean
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m 'galyleo_clean command failed.'
         exit 1
       fi
 
