@@ -28,7 +28,7 @@
 #
 # LAST UPDATED
 #
-#     Thursday, March 18th, 2021
+#     Friday, March 19th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -72,7 +72,7 @@ source "${GALYLEO_INSTALL_DIR}/lib/slog.sh"
 #
 # Arguments:
 #
-#   -M | --mode <mode>
+#      | --mode <mode>
 #   -A | --account <account>
 #   -R | --reservation <reservation>
 #   -p | --partition <partition>
@@ -80,8 +80,8 @@ source "${GALYLEO_INSTALL_DIR}/lib/slog.sh"
 #   -N | --nodes <nodes>
 #   -n | --ntasks-per-node <ntasks_per_node>
 #   -c | --cpus-per-task <cpus_per_node>
-#   -M | --memory-per-node <memory_per_node>
-#   -m | --memory-per-cpu <memory_per_cpu>
+#   -M | --memory-per-node <memory_per_node> (in units of GB)
+#   -m | --memory-per-cpu <memory_per_cpu> (in units of GB)
 #   -G | --gpus <gpus>
 #      | --gres <gres>
 #   -t | --time-limit <time_limit>
@@ -153,7 +153,7 @@ function galyleo_launch() {
   # variables.
   while (("${#}" > 0)); do
     case "${1}" in
-      -M | --mode )
+      --mode )
         mode="${2}"
         shift 2
         ;;
@@ -263,7 +263,7 @@ function galyleo_launch() {
   slog output -m 'Preparing galyleo for launch into Jupyter orbit ...'
   slog output -m 'Listing all launch parameters ...'
   slog output -m '  command-line option      : value'
-  slog output -m "    -M | --mode            : ${mode}"
+  slog output -m "       | --mode            : ${mode}"
   slog output -m "    -A | --account         : ${account}"
   slog output -m "    -R | --reservation     : ${reservation}"
   slog output -m "    -p | --partition       : ${partition}"
@@ -271,8 +271,8 @@ function galyleo_launch() {
   slog output -m "    -N | --nodes           : ${nodes}"
   slog output -m "    -n | --ntasks-per-node : ${ntasks_per_node}"
   slog output -m "    -c | --cpus-per-task   : ${cpus_per_task}"
-  slog output -m "    -M | --memory-per-node : ${memory_per_node}"
-  slog output -m "    -m | --memory-per-cpu  : ${memory_per_cpu}"
+  slog output -m "    -M | --memory-per-node : ${memory_per_node} GB"
+  slog output -m "    -m | --memory-per-cpu  : ${memory_per_cpu} GB"
   slog output -m "    -G | --gpus            : ${gpus}"
   slog output -m "       | --gres            : ${gres}"
   slog output -m "    -t | --time-limit      : ${time_limit}"
@@ -535,8 +535,8 @@ function galyleo_help() {
   slog output -m "    -N | --nodes           : ${nodes}"
   slog output -m "    -n | --ntasks-per-node : ${ntasks_per_node}"
   slog output -m "    -c | --cpus-per-task   : ${cpus_per_task}"
-  slog output -m "    -M | --memory-per-node : ${memory_per_node}"
-  slog output -m "    -m | --memory-per-cpu  : ${memory_per_cpu}"
+  slog output -m "    -M | --memory-per-node : ${memory_per_node} GB"
+  slog output -m "    -m | --memory-per-cpu  : ${memory_per_cpu} GB"
   slog output -m "    -G | --gpus            : ${gpus}"
   slog output -m "       | --gres            : ${gres}"
   slog output -m "    -t | --time-limit      : ${time_limit}"
