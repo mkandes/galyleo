@@ -28,7 +28,7 @@
 #
 # LAST UPDATED
 #
-#     Wednesday, March 17th, 2021
+#     Thursday, March 18th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -443,8 +443,7 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m ''
 
     # Redeem the connection token from reverse proxy service.
-    slog append -f "${job_name}.sh" -m 'echo "https://manage.${REVERSE_PROXY_FQDN}/redeemtoken.cgi?token=${REVERSE_PROXY_TOKEN}&port=${JUPYTER_PORT}"'
-    slog append -f "${job_name}.sh" -m "eval curl '\"https://manage.\${REVERSE_PROXY_FQDN}/redeemtoken.cgi?token=\${REVERSE_PROXY_TOKEN}&port=\${JUPYTER_PORT}\"'"
+    slog append -f "${job_name}.sh" -m 'curl "https://manage.${REVERSE_PROXY_FQDN}/redeemtoken.cgi?token=${REVERSE_PROXY_TOKEN}&port=${JUPYTER_PORT}"'
     slog append -f "${job_name}.sh" -m ''
 
     slog append -f "${job_name}.sh" -m 'wait'
@@ -465,12 +464,14 @@ function galyleo_launch() {
     slog output -m "Submitted Jupyter launch script to Slurm. Your SLURM_JOB_ID is ${job_id}."
   fi
 
+  # Associate batch job id to the connection token from the reverse proxy service.
+  curl "https://manage.${REVERSE_PROXY_FQDN}/linktoken.cgi?token=${REVERSE_PROXY_TOKEN}&jobid=${job_id}"
+
   # Always print to standard output the URL where the Jupyter notebook 
   # server may be accessed by the user.
   slog output -m 'Please copy and paste the HTTPS URL provided below into your web browser.'
   slog output -m 'Do not share this URL with others. It is the password to your Jupyter notebook session.'
   slog output -m 'Your Jupyter notebook session will begin once compute resources are allocated to your Slurm job by the scheduler.'
-  slog output -m ''
   echo "https://${REVERSE_PROXY_TOKEN}.${REVERSE_PROXY_FQDN}?token=${JUPYTER_TOKEN}"
 
   return 0
