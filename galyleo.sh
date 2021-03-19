@@ -14,6 +14,31 @@
 #
 #     <INSERT USAGE DESCRIPTION HERE>
 #
+       | --mode <mode>
+#   -A | --account <account>
+#   -R | --reservation <reservation>
+#   -p | --partition <partition>
+#   -q | --qos <qos>
+#   -N | --nodes <nodes>
+#   -n | --ntasks-per-node <ntasks_per_node>
+#   -c | --cpus-per-task <cpus_per_node>
+#   -M | --memory-per-node <memory_per_node> (in units of GB)
+#   -m | --memory-per-cpu <memory_per_cpu> (in units of GB)
+#   -G | --gpus <gpus>
+#      | --gres <gres>
+#   -t | --time-limit <time_limit>
+#   -C | --constraint <constraint>
+#   -j | --jupyter <jupyter_interface>
+#   -d | --notebook-dir <jupyter_notebook_dir>
+#   -r | --reverse-proxy <reverse_proxy_fqdn>
+#   -D | --dns-domain <dns_domain>
+#   -s | --sif <singularity_image_file>
+#   -B | --bind <singularity_bind_mounts>
+#      | --nv
+#   -e | --env-modules <env_modules>
+#      | --conda-env <conda_env>
+#   -Q | --quiet
+#
 # DEPENDENCIES
 #
 #     <INSERT DEPS DESCRIPTION HERE>
@@ -95,6 +120,7 @@ source "${GALYLEO_INSTALL_DIR}/lib/slog.sh"
 #      | --nv
 #   -e | --env-modules <env_modules>
 #      | --conda-env <conda_env>
+#   -Q | --quiet
 #
 # Returns:
 #
@@ -285,6 +311,7 @@ function galyleo_launch() {
   slog output -m "       | --nv              : ${singularity_gpu_type}"
   slog output -m "    -e | --env-modules     : ${env_modules}"
   slog output -m "       | --conda-env       : ${conda_env}"
+  slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
 
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
@@ -465,7 +492,8 @@ function galyleo_launch() {
   fi
 
   # Associate batch job id to the connection token from the reverse proxy service.
-  curl "https://manage.${REVERSE_PROXY_FQDN}/linktoken.cgi?token=${REVERSE_PROXY_TOKEN}&jobid=${job_id}"
+  http_response="$(curl https://manage.${REVERSE_PROXY_FQDN}/linktoken.cgi?token=${REVERSE_PROXY_TOKEN}&jobid=${job_id})"
+  slog output -m "${http_response}"
 
   # Always print to standard output the URL where the Jupyter notebook 
   # server may be accessed by the user.
@@ -549,6 +577,7 @@ function galyleo_help() {
   slog output -m "       | --nv              : ${singularity_gpu_type}"
   slog output -m "    -e | --env-modules     : ${env_modules}"
   slog output -m "       | --conda-env       : ${conda_env}"
+  slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
   slog output -m ''
 
   return 0
