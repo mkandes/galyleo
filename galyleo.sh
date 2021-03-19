@@ -14,7 +14,7 @@
 #
 #     <INSERT USAGE DESCRIPTION HERE>
 #
-       | --mode <mode>
+#      | --mode <mode>
 #   -A | --account <account>
 #   -R | --reservation <reservation>
 #   -p | --partition <partition>
