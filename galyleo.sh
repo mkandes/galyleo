@@ -492,7 +492,7 @@ function galyleo_launch() {
   fi
 
   # Associate batch job id to the connection token from the reverse proxy service.
-  http_response="$(curl -s https://manage.${REVERSE_PROXY_FQDN}/linktoken.cgi?token=${REVERSE_PROXY_TOKEN}&jobid=${job_id})"
+  http_response="$(curl -s https://manage.${REVERSE_PROXY_FQDN}/linktoken.cgi?token=${REVERSE_PROXY_TOKEN}\&jobid=${job_id})"
   slog output -m "${http_response}"
 
   # Always print to standard output the URL where the Jupyter notebook 
