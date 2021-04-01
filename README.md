@@ -15,7 +15,7 @@ git clone https://github.com/mkandes/galyleo.git
 
 ## Status
 
-*** CURRENTLY UNDER ACTIVE DEVELOPMENT. DO NOT USE. ***
+Prototype. Deployed on E X P A N S E @ SDSC. A work in progress.
 
 ## Contribute
 
@@ -33,8 +33,8 @@ University of California, San Diego
 
 ## Version
 
-0.1.6
+0.1.8
 
 ## Last Updated
 
-Friday, March 19th, 2021
+Thursday, April 1st, 2021
