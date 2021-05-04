@@ -12,36 +12,7 @@
 #
 # USAGE
 #
-#     <INSERT USAGE DESCRIPTION HERE>
-#
-#      | --mode <mode>
-#   -A | --account <account>
-#   -R | --reservation <reservation>
-#   -p | --partition <partition>
-#   -q | --qos <qos>
-#   -N | --nodes <nodes>
-#   -n | --ntasks-per-node <ntasks_per_node>
-#   -c | --cpus-per-task <cpus_per_node>
-#   -M | --memory-per-node <memory_per_node> (in units of GB)
-#   -m | --memory-per-cpu <memory_per_cpu> (in units of GB)
-#   -G | --gpus <gpus>
-#      | --gres <gres>
-#   -t | --time-limit <time_limit>
-#   -C | --constraint <constraint>
-#   -j | --jupyter <jupyter_interface>
-#   -d | --notebook-dir <jupyter_notebook_dir>
-#   -r | --reverse-proxy <reverse_proxy_fqdn>
-#   -D | --dns-domain <dns_domain>
-#   -s | --sif <singularity_image_file>
-#   -B | --bind <singularity_bind_mounts>
-#      | --nv
-#   -e | --env-modules <env_modules>
-#      | --conda-env <conda_env>
-#   -Q | --quiet
-#
 # DEPENDENCIES
-#
-#     <INSERT DEPS DESCRIPTION HERE>
 #
 # AUTHOR(S)
 #
@@ -53,7 +24,7 @@
 #
 # LAST UPDATED
 #
-#     Thursday, April 1st, 2021
+#     Monday, May 3rd, 2021
 #
 # ----------------------------------------------------------------------
 
