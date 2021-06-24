@@ -14,6 +14,16 @@
 #
 # DEPENDENCIES
 #
+#     jupyter
+#     jupyterlab
+#
+# TODO
+#
+#     Add application/launch templating
+#     Add "--transport=ipc"?
+#     Add support for other, non-jupyter-based web services; e.g., Spark 
+#       and TensorBoard
+#
 # AUTHOR(S)
 #
 #     Marty Kandes, Ph.D.
@@ -24,7 +34,7 @@
 #
 # LAST UPDATED
 #
-#     Monday, May 3rd, 2021
+#     Thursday, June 24th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -359,6 +369,10 @@ function galyleo_launch() {
 
     if [[ -n "${reservation}" ]]; then
       slog append -f "${job_name}.sh" -m "#SBATCH --reservation=${reservation}"
+    fi
+
+    if [[ -n "${qos}" ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --qos=${qos}"
     fi
 
     slog append -f "${job_name}.sh" -m "#SBATCH --partition=${partition}"
