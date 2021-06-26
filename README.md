@@ -33,7 +33,7 @@ galyleo.sh launch --account 'abc123' --partition 'gpu-shared' --cpus-per-task 10
 This project is currently a prototype under active development at 
 [SDSC](https://www.sdsc.edu), where it is currently deployed on both 
 [Comet](https://www.sdsc.edu/support/user_guides/comet.html) and 
-[Expanse](https://expanse.sdsc.edu). It is being integrated with the 
+[Expanse](https://expanse.sdsc.edu). It has been integrated with the 
 Open OnDemand-based [Expanse Portal](https://portal.expanse.sdsc.edu)
 to simplify launching Jupyter notebooks on Expanse.
 
@@ -53,8 +53,8 @@ University of California, San Diego
 
 ## Version
 
-0.2.1
+0.2.2
 
 ## Last Updated
 
-Thursday, June 24th, 2021
+Saturday, June 26th, 2021

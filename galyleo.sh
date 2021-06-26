@@ -16,6 +16,7 @@
 #
 #     jupyter
 #     jupyterlab
+#     satellite - https://github.com/sdsc-hpc-training-org/satellite
 #
 # TODO
 #
@@ -34,7 +35,7 @@
 #
 # LAST UPDATED
 #
-#     Thursday, June 24th, 2021
+#     Saturday, June 26th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -447,7 +448,7 @@ function galyleo_launch() {
       fi
       slog append -f "${job_name}.sh" -m "  ${singularity_image_file} \\"
     fi
-    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --no-browser &"
+    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
     slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
     slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
     slog append -f "${job_name}.sh" -m '  exit 1'
