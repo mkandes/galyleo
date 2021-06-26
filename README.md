@@ -53,7 +53,7 @@ University of California, San Diego
 
 ## Version
 
-0.2.2
+0.2.3
 
 ## Last Updated
 

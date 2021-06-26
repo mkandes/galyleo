@@ -345,6 +345,9 @@ function galyleo_launch() {
   # purging of older files to prevent cache buildup.
   if [[ ! -d "${GALYLEO_CACHE_DIR}" ]]; then
     mkdir -p "${GALYLEO_CACHE_DIR}"
+    chmod u+rwx "${GALYLEO_CACHE_DIR}"
+    chmod g-rwx "${GALYLEO_CACHE_DIR}"
+    chmod o-rwx "${GALYLEO_CACHE_DIR}"
     if [[ "${?}" -ne 0 ]]; then
       slog error -m "Failed to create GALYLEO_CACHE_DIR at ${GALYLEO_CACHE_DIR}."
       return 1
