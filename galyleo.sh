@@ -294,6 +294,29 @@ function galyleo_launch() {
   slog output -m "       | --conda-env       : ${conda_env}"
   slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
 
+  # Check if the user specified a working directory for their Jupyter
+  # notebook server. If the user did not specify a working directory,
+  # then set the working directory to the user's $HOME directory.
+  if [[ -z "${jupyter_notebook_dir}" ]]; then
+    jupyter_notebook_dir="${HOME}"
+  fi
+
+  # Change the present working directory to the Jupyter notebook
+  # directory. If the directory does not exist, then halt the launch.
+  cd "${jupyter_notebook_dir}"
+  if [[ "${?}" -ne 0 ]]; then
+    if [[ ! -d "${jupyter_notebook_dir}" ]]; then
+      slog error -m 'Jupyter notebook directory does not exist. Cannot change directory.'
+    else
+      slog error -m 'Unable to change directory to the Jupyter notebook directory.'
+    fi
+    return 1
+  fi
+
+  # TODO: Check if the software environment specified by the user can be
+  # loaded successfully. e.g., Can all of the environment modules be
+  # loaded? Can the conda enviroment be loaded? Is Singularity available?
+
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
   http_response="$(curl -s -w %{http_code} https://manage.${reverse_proxy_fqdn}/getlink.cgi -o -)"
@@ -311,25 +334,6 @@ function galyleo_launch() {
   # Extract the reverse proxy connection token and export it as a
   # read-only environment variable.
   declare -xr REVERSE_PROXY_TOKEN="$(echo ${http_response} | awk 'NF>1{printf $((NF-1))}' -)"
-
-  # Check if the user specified a working directory for their Jupyter
-  # notebook server. If the user did not specify a working directory, 
-  # then set the working directory to the user's $HOME directory.
-  if [[ -z "${jupyter_notebook_dir}" ]]; then
-    jupyter_notebook_dir="${HOME}"  
-  fi
-
-  # Change the present working directory to the Jupyter notebook 
-  # directory. If the directory does not exist, then halt the launch.
-  cd "${jupyter_notebook_dir}"
-  if [[ "${?}" -ne 0 ]]; then
-    if [[ ! -d "${jupyter_notebook_dir}" ]]; then 
-      slog error -m 'Jupyter notebook directory does not exist. Cannot change directory.'
-    else
-      slog error -m 'Unable to change directory to the Jupyter notebook directory.'
-    fi 
-    return 1 
-  fi
 
   # Generate an authentication token to be used for first-time 
   # connections to the Jupyter notebook server and export it as a 
@@ -475,7 +479,7 @@ function galyleo_launch() {
 
     # Revoke the connection token from reverse proxy service once the
     # Jupyter server has been shutdown.
-    slog append -f "${job_name}.sh" -m 'curl "https://manage.${REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN}'
+    slog append -f "${job_name}.sh" -m 'curl "https://manage.${REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN}"'
 
   else
 
