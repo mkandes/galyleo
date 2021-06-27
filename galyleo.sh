@@ -21,7 +21,6 @@
 # TODO
 #
 #     Add application/launch templating
-#     Add "--transport=ipc"?
 #     Add support for other, non-jupyter-based web services; e.g., Spark 
 #       and TensorBoard
 #
@@ -298,6 +297,7 @@ function galyleo_launch() {
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
   http_response="$(curl -s -w %{http_code} https://manage.${reverse_proxy_fqdn}/getlink.cgi -o -)"
+  slog output -m "${http_response}"
   http_status_code="$(echo ${http_response} | awk '{print $NF}')"
   if (( "${http_status_code}" != 200 )); then
     slog error -m "Unable to connect to the reverse proxy service: ${http_status_code}"
@@ -413,8 +413,8 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m 'declare -i random_ephemeral_port=-1'
     slog append -f "${job_name}.sh" -m ''
 
+    # Load environment modules specified by the user.
     slog append -f "${job_name}.sh" -m 'module purge'
-
     if [[ -n "${env_modules}" ]]; then
       IFS=','
       read -r -a modules <<< "${env_modules}"
@@ -424,12 +424,14 @@ function galyleo_launch() {
       done
     fi
 
+    # Activate a conda environment specified by the user.
     if [[ -n "${conda_env}" ]]; then
       slog append -f "${job_name}.sh" -m 'source ~/.bashrc'
       slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
     fi
     slog append -f "${job_name}.sh" -m ''
 
+    # Choose an open ephemeral port at random.
     slog append -f "${job_name}.sh" -m 'while (( "${JUPYTER_PORT}" < 0 )); do'
     slog append -f "${job_name}.sh" -m '  while (( "${random_ephemeral_port}" < "${LOWEST_EPHEMERAL_PORT}" )); do'
     slog append -f "${job_name}.sh" -m '    random_ephemeral_port="$(od -An -N 2 -t u2 -v < /dev/urandom)"'
@@ -441,6 +443,8 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m 'done'
     slog append -f "${job_name}.sh" -m ''
 
+    # Structure the singularity exec command and its command-line
+    # options specified by the user.
     if [[ -n "${singularity_image_file}" ]]; then
       slog append -f "${job_name}.sh" -m 'singularity exec \'
       if [[ -n "${singularity_bind_mounts}" ]]; then
@@ -451,6 +455,8 @@ function galyleo_launch() {
       fi
       slog append -f "${job_name}.sh" -m "  ${singularity_image_file} \\"
     fi
+
+    # Run the Jupyter server process in the backgroud.
     slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
     slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
     slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
@@ -458,11 +464,18 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m 'fi'
     slog append -f "${job_name}.sh" -m ''
 
-    # Redeem the connection token from reverse proxy service.
+    # Redeem the connection token from reverse proxy service to enable
+    # proxy mapping.
     slog append -f "${job_name}.sh" -m 'curl "https://manage.${REVERSE_PROXY_FQDN}/redeemtoken.cgi?token=${REVERSE_PROXY_TOKEN}&port=${JUPYTER_PORT}"'
     slog append -f "${job_name}.sh" -m ''
 
+    # Wait for the Jupyter server to be shutdown by the user.
     slog append -f "${job_name}.sh" -m 'wait'
+    slog append -f "${job_name}.sh" -m ''
+
+    # Revoke the connection token from reverse proxy service once the
+    # Jupyter server has been shutdown.
+    slog append -f "${job_name}.sh" -m 'curl "https://manage.${REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN}'
 
   else
 
@@ -475,6 +488,8 @@ function galyleo_launch() {
   job_id="$(sbatch ${job_name}.sh | grep -o '[[:digit:]]*')"
   if [[ "${?}" -ne 0 ]]; then
     slog error -m 'Failed job submission to Slurm.'
+    http_response="$(curl -s https://manage.${REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN})"
+    slog output -m "${http_response}"
     return 1
   else
     slog output -m "Submitted Jupyter launch script to Slurm. Your SLURM_JOB_ID is ${job_id}."
