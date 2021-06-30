@@ -53,8 +53,8 @@ University of California, San Diego
 
 ## Version
 
-0.2.6
+0.2.7
 
 ## Last Updated
 
-Tuesday, June 29th, 2021
+Wednesday, June 30th, 2021

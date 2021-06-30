@@ -20,7 +20,6 @@
 #
 # TODO
 #
-#     Add application/launch templating
 #     Add support for other, non-jupyter-based web services; e.g., Spark 
 #       and TensorBoard
 #
@@ -34,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Tuesday, June 29th, 2021
+#     Wednesday, June 30th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -266,6 +265,65 @@ function galyleo_launch() {
     esac
   done
 
+  # Check if the user specified a Jupyter user interface. If the user
+  # did not specify a user interface, then set JupyterLab ('lab') as the
+  # default interface.
+  if [[ -z "${jupyter_user_interface}" ]]; then
+    jupyter_user_interface='lab'
+  fi
+
+  # Check if a valid Jupyter user interface was specified. At 
+  # present, the only two valid user interfaces are JupyterLab ('lab')
+  # OR Jupyter Notebook ('notebook').
+  case "${jupyter_user_interface}" in
+    'lab' )
+      ;;
+    'notebook' )
+      ;;
+    *)
+    slog error -m "Not a valid Jupyter user interface: ${jupyter_user_interface}"
+    slog error -m "Only --jupyter lab OR --jupyter notebook are allowed."
+    return 1
+  esac
+
+  # Check if the user specified a working directory for their Jupyter
+  # notebook session. If the user did not specify a working directory,
+  # then set the working directory to the user's $HOME directory.
+  if [[ -z "${jupyter_notebook_dir}" ]]; then
+    jupyter_notebook_dir="${HOME}"
+  fi
+
+  # Change the present working directory to the Jupyter notebook
+  # directory. If the directory does not exist, then halt the launch.
+  cd "${jupyter_notebook_dir}"
+  if [[ "${?}" -ne 0 ]]; then
+    if [[ ! -d "${jupyter_notebook_dir}" ]]; then
+      slog error -m "Jupyter notebook directory does not exist: ${jupyter_notebook_dir}"
+    else
+      slog error -m 'Unable to change directory to the Jupyter notebook directory.'
+    fi
+    return 1
+  fi
+
+  # TODO: Check if the software environment specified by the user can be
+  # loaded successfully. e.g., Can all of the environment modules be
+  # loaded? Can the conda enviroment be loaded? Is Singularity available?
+
+  # Check if all environment modules specified by the user, if any, are
+  # available and can be loaded successfully. If not, then halt the launch.
+  if [[ -n "${env_modules}" ]]; then
+    IFS=','
+    read -r -a modules <<< "${env_modules}"
+    unset IFS
+    for module in "${modules[@]}"; do
+      module load "${module}"
+      if [[ $? -ne 0 ]]; then
+        slog error -m "module not found: ${module}"
+        return 1
+      fi
+    done
+  fi
+
   # Print all command-line options read in for launch to standard output.
   slog output -m 'Preparing galyleo for launch into Jupyter orbit ...'
   slog output -m 'Listing all launch parameters ...'
@@ -293,46 +351,6 @@ function galyleo_launch() {
   slog output -m "    -e | --env-modules     : ${env_modules}"
   slog output -m "       | --conda-env       : ${conda_env}"
   slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
-
-  # Check if the user specified a Jupyter user interface. If the user
-  # did not specify a user interface, then set JupyterLab as the default
-  # interface.
-  if [[ -z "${jupyter_user_interface}" ]]; then
-    jupyter_user_interface='lab'
-  fi
-
-  # Check if a valid Jupyter user interface was specified. At 
-  # present, the only two valid user interfaces are JupyterLab ('lab')
-  # OR Jupyter Notebook ('notebook').
-  if [[ "${jupyter_user_interface}" != 'lab' || \
-        "${jupyter_user_interface}" != 'notebook' ]]; then
-    slog error -m "Not a valid Jupyter user interface: --jupyter ${jupyter_user_interface}"
-    slog error -m "Only --jupyter lab OR --jupyter notebook are currently allowed."
-    return 1
-  fi
-
-  # Check if the user specified a working directory for their Jupyter
-  # notebook session. If the user did not specify a working directory,
-  # then set the working directory to the user's $HOME directory.
-  if [[ -z "${jupyter_notebook_dir}" ]]; then
-    jupyter_notebook_dir="${HOME}"
-  fi
-
-  # Change the present working directory to the Jupyter notebook
-  # directory. If the directory does not exist, then halt the launch.
-  cd "${jupyter_notebook_dir}"
-  if [[ "${?}" -ne 0 ]]; then
-    if [[ ! -d "${jupyter_notebook_dir}" ]]; then
-      slog error -m 'Jupyter notebook directory does not exist. Cannot change directory.'
-    else
-      slog error -m 'Unable to change directory to the Jupyter notebook directory.'
-    fi
-    return 1
-  fi
-
-  # TODO: Check if the software environment specified by the user can be
-  # loaded successfully. e.g., Can all of the environment modules be
-  # loaded? Can the conda enviroment be loaded? Is Singularity available?
 
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
