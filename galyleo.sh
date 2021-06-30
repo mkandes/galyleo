@@ -265,6 +265,34 @@ function galyleo_launch() {
     esac
   done
 
+  # Print all command-line options read in for launch to standard output.
+  slog output -m 'Preparing galyleo for launch into Jupyter orbit ...'
+  slog output -m 'Listing all launch parameters ...'
+  slog output -m '  command-line option      : value'
+  slog output -m "       | --mode            : ${mode}"
+  slog output -m "    -A | --account         : ${account}"
+  slog output -m "    -R | --reservation     : ${reservation}"
+  slog output -m "    -p | --partition       : ${partition}"
+  slog output -m "    -q | --qos             : ${qos}"
+  slog output -m "    -N | --nodes           : ${nodes}"
+  slog output -m "    -n | --ntasks-per-node : ${ntasks_per_node}"
+  slog output -m "    -c | --cpus-per-task   : ${cpus_per_task}"
+  slog output -m "    -M | --memory-per-node : ${memory_per_node} GB"
+  slog output -m "    -m | --memory-per-cpu  : ${memory_per_cpu} GB"
+  slog output -m "    -G | --gpus            : ${gpus}"
+  slog output -m "       | --gres            : ${gres}"
+  slog output -m "    -t | --time-limit      : ${time_limit}"
+  slog output -m "    -j | --jupyter         : ${jupyter_user_interface}"
+  slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
+  slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
+  slog output -m "    -D | --dns-domain      : ${dns_domain}"
+  slog output -m "    -s | --sif             : ${singularity_image_file}"
+  slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
+  slog output -m "       | --nv              : ${singularity_gpu_type}"
+  slog output -m "    -e | --env-modules     : ${env_modules}"
+  slog output -m "       | --conda-env       : ${conda_env}"
+  slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
+
   # Check if the user specified a Jupyter user interface. If the user
   # did not specify a user interface, then set JupyterLab ('lab') as the
   # default interface.
@@ -274,7 +302,8 @@ function galyleo_launch() {
 
   # Check if a valid Jupyter user interface was specified. At 
   # present, the only two valid user interfaces are JupyterLab ('lab')
-  # OR Jupyter Notebook ('notebook').
+  # OR Jupyter Notebook ('notebook'). If an invalid interface name is
+  # provided by the user, then halt the launch.
   case "${jupyter_user_interface}" in
     'lab' )
       ;;
@@ -305,10 +334,6 @@ function galyleo_launch() {
     return 1
   fi
 
-  # TODO: Check if the software environment specified by the user can be
-  # loaded successfully. e.g., Can all of the environment modules be
-  # loaded? Can the conda enviroment be loaded? Is Singularity available?
-
   # Check if all environment modules specified by the user, if any, are
   # available and can be loaded successfully. If not, then halt the launch.
   if [[ -n "${env_modules}" ]]; then
@@ -324,33 +349,20 @@ function galyleo_launch() {
     done
   fi
 
-  # Print all command-line options read in for launch to standard output.
-  slog output -m 'Preparing galyleo for launch into Jupyter orbit ...'
-  slog output -m 'Listing all launch parameters ...'
-  slog output -m '  command-line option      : value'
-  slog output -m "       | --mode            : ${mode}"
-  slog output -m "    -A | --account         : ${account}"
-  slog output -m "    -R | --reservation     : ${reservation}"
-  slog output -m "    -p | --partition       : ${partition}"
-  slog output -m "    -q | --qos             : ${qos}"
-  slog output -m "    -N | --nodes           : ${nodes}"
-  slog output -m "    -n | --ntasks-per-node : ${ntasks_per_node}"
-  slog output -m "    -c | --cpus-per-task   : ${cpus_per_task}"
-  slog output -m "    -M | --memory-per-node : ${memory_per_node} GB"
-  slog output -m "    -m | --memory-per-cpu  : ${memory_per_cpu} GB"
-  slog output -m "    -G | --gpus            : ${gpus}"
-  slog output -m "       | --gres            : ${gres}"
-  slog output -m "    -t | --time-limit      : ${time_limit}"
-  slog output -m "    -j | --jupyter         : ${jupyter_user_interface}"
-  slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
-  slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
-  slog output -m "    -D | --dns-domain      : ${dns_domain}"
-  slog output -m "    -s | --sif             : ${singularity_image_file}"
-  slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
-  slog output -m "       | --nv              : ${singularity_gpu_type}"
-  slog output -m "    -e | --env-modules     : ${env_modules}"
-  slog output -m "       | --conda-env       : ${conda_env}"
-  slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
+  # Check if the conda environment specified by the user, if any, has
+  # been initialized, configured in the user's .bashrc file, and can be
+  # activated successfully. If not, then halt the launch.
+  if [[ -n "${conda_env}" ]]; then
+    source ~/.bashrc
+    conda activate "${conda_env}"
+    if [[ $? -ne 0 ]]; then
+      slog error -m "conda environment not found: ${conda_env}"
+      return 1
+    fi
+  fi
+
+  # Check if the singularity image file specified by the user, if any,
+  # exists. If it does not exist, then halt launch.
 
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
