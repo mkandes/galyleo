@@ -34,7 +34,7 @@
 #
 # LAST UPDATED
 #
-#     Saturday, June 26th, 2021
+#     Tuesday, June 29th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -92,7 +92,7 @@ source "${GALYLEO_INSTALL_DIR}/lib/slog.sh"
 #      | --gres <gres>
 #   -t | --time-limit <time_limit>
 #   -C | --constraint <constraint>
-#   -j | --jupyter <jupyter_interface>
+#   -j | --jupyter <jupyter_user_interface>
 #   -d | --notebook-dir <jupyter_notebook_dir>
 #   -r | --reverse-proxy <reverse_proxy_fqdn>
 #   -D | --dns-domain <dns_domain>
@@ -132,7 +132,7 @@ function galyleo_launch() {
   local comment='galyleo'
 
   # Declare input variables associated with Jupyter runtime environment.
-  local jupyter_interface='lab'
+  local jupyter_user_interface=''
   local jupyter_notebook_dir=''
 
   # Declare input variable associated with reverse proxy service.
@@ -217,7 +217,7 @@ function galyleo_launch() {
         shift 2
         ;;
       -j | --jupyter )
-        jupyter_interface="${2}"
+        jupyter_user_interface="${2}"
         shift 2
         ;;
       -d | --notebook-dir )
@@ -283,7 +283,7 @@ function galyleo_launch() {
   slog output -m "    -G | --gpus            : ${gpus}"
   slog output -m "       | --gres            : ${gres}"
   slog output -m "    -t | --time-limit      : ${time_limit}"
-  slog output -m "    -j | --jupyter         : ${jupyter_interface}"
+  slog output -m "    -j | --jupyter         : ${jupyter_user_interface}"
   slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
   slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
   slog output -m "    -D | --dns-domain      : ${dns_domain}"
@@ -294,8 +294,25 @@ function galyleo_launch() {
   slog output -m "       | --conda-env       : ${conda_env}"
   slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
 
+  # Check if the user specified a Jupyter user interface. If the user
+  # did not specify a user interface, then set JupyterLab as the default
+  # interface.
+  if [[ -z "${jupyter_user_interface}" ]]; then
+    jupyter_user_interface='lab'
+  fi
+
+  # Check if a valid Jupyter user interface was specified. At 
+  # present, the only two valid user interfaces are JupyterLab ('lab')
+  # OR Jupyter Notebook ('notebook').
+  if [[ "${jupyter_user_interface}" != 'lab' || \
+        "${jupyter_user_interface}" != 'notebook' ]]; then
+    slog error -m "Not a valid Jupyter user interface: --jupyter ${jupyter_user_interface}"
+    slog error -m "Only --jupyter lab OR --jupyter notebook are currently allowed."
+    return 1
+  fi
+
   # Check if the user specified a working directory for their Jupyter
-  # notebook server. If the user did not specify a working directory,
+  # notebook session. If the user did not specify a working directory,
   # then set the working directory to the user's $HOME directory.
   if [[ -z "${jupyter_notebook_dir}" ]]; then
     jupyter_notebook_dir="${HOME}"
@@ -461,7 +478,7 @@ function galyleo_launch() {
     fi
 
     # Run the Jupyter server process in the backgroud.
-    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
+    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_user_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
     slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
     slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
     slog append -f "${job_name}.sh" -m '  exit 1'
@@ -576,7 +593,7 @@ function galyleo_help() {
   slog output -m "    -G | --gpus            : ${gpus}"
   slog output -m "       | --gres            : ${gres}"
   slog output -m "    -t | --time-limit      : ${time_limit}"
-  slog output -m "    -j | --jupyter         : ${jupyter_interface}"
+  slog output -m "    -j | --jupyter         : ${jupyter_user_interface}"
   slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
   slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
   slog output -m "    -D | --dns-domain      : ${dns_domain}"
