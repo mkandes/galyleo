@@ -59,8 +59,20 @@ declare -xir CURRENT_UNIX_TIME="$(date +'%s')"
 declare -xir RANDOM_ID="${RANDOM}"
 
 # Source all shell libraries required for galyleo.
-
 source "${GALYLEO_INSTALL_DIR}/lib/slog.sh"
+
+# Source the galyleo configuration file. If it does not exist yet, then
+# one must be created with the galyleo configure command. A galyleo.conf
+# file must be created prior to end-user use of its launch capabilities.
+if [[ ! -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" ]]; then
+  slog warning -m 'galyleo.conf file does not exist yet.'
+else
+  source "${GALYLEO_INSTALL_DIR}/galyleo.conf"
+  if [[ "${?}" -ne 0 ]]; then
+    slog error -m 'Failed to source galyleo.conf file.'
+    exit 1
+  fi
+fi
 
 # ----------------------------------------------------------------------
 # galyleo_launch
@@ -91,7 +103,7 @@ source "${GALYLEO_INSTALL_DIR}/lib/slog.sh"
 #      | --gres <gres>
 #   -t | --time-limit <time_limit>
 #   -C | --constraint <constraint>
-#   -j | --jupyter <jupyter_user_interface>
+#   -j | --jupyter <jupyter_interface>
 #   -d | --notebook-dir <jupyter_notebook_dir>
 #   -r | --reverse-proxy <reverse_proxy_fqdn>
 #   -D | --dns-domain <dns_domain>
@@ -113,10 +125,10 @@ function galyleo_launch() {
   # Declare galyleo launch mode variable and set its default to 'local'.
   local mode='local'
 
-  # Declare input variables associated with Slurm sbatch options.
+  # Declare input variables associated with scheduler.
   local account=''
   local reservation=''
-  local partition='shared'
+  local partition="${GALYLEO_DEFAULT_PARTITION}"
   local qos=''
   local -i nodes=1
   local -i ntasks_per_node=1
@@ -129,12 +141,12 @@ function galyleo_launch() {
   local constraint=''
 
   # Declare input variables associated with Jupyter runtime environment.
-  local jupyter_user_interface=''
+  local jupyter_interface="${GALYLEO_DEFAULT_JUPYTER_INTERFACE}"
   local jupyter_notebook_dir=''
 
   # Declare input variable associated with reverse proxy service.
-  local reverse_proxy_fqdn='expanse-user-content.sdsc.edu'
-  local dns_domain='eth.cluster'
+  local reverse_proxy_fqdn="${GALYLEO_REVERSE_PROXY_FQDN}"
+  local dns_domain="${GALYLEO_DNS_DOMAIN}"
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
@@ -214,7 +226,7 @@ function galyleo_launch() {
         shift 2
         ;;
       -j | --jupyter )
-        jupyter_user_interface="${2}"
+        jupyter_interface="${2}"
         shift 2
         ;;
       -d | --notebook-dir )
@@ -280,7 +292,7 @@ function galyleo_launch() {
   slog output -m "    -G | --gpus            : ${gpus}"
   slog output -m "       | --gres            : ${gres}"
   slog output -m "    -t | --time-limit      : ${time_limit}"
-  slog output -m "    -j | --jupyter         : ${jupyter_user_interface}"
+  slog output -m "    -j | --jupyter         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
   slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
   slog output -m "    -D | --dns-domain      : ${dns_domain}"
@@ -294,21 +306,21 @@ function galyleo_launch() {
   # Check if the user specified a Jupyter user interface. If the user
   # did not specify a user interface, then set JupyterLab ('lab') as the
   # default interface.
-  if [[ -z "${jupyter_user_interface}" ]]; then
-    jupyter_user_interface='lab'
+  if [[ -z "${jupyter_interface}" ]]; then
+    jupyter_interface='lab'
   fi
 
   # Check if a valid Jupyter user interface was specified. At 
   # present, the only two valid user interfaces are JupyterLab ('lab')
   # OR Jupyter Notebook ('notebook'). If an invalid interface name is
   # provided by the user, then halt the launch.
-  case "${jupyter_user_interface}" in
+  case "${jupyter_interface}" in
     'lab' )
       ;;
     'notebook' )
       ;;
     *)
-    slog error -m "Not a valid Jupyter user interface: ${jupyter_user_interface}"
+    slog error -m "Not a valid Jupyter user interface: ${jupyter_interface}"
     slog error -m "Only --jupyter lab OR --jupyter notebook are allowed."
     return 1
   esac
@@ -512,7 +524,7 @@ function galyleo_launch() {
     fi
 
     # Run the Jupyter server process in the backgroud.
-    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_user_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
+    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
     slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
     slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
     slog append -f "${job_name}.sh" -m '  exit 1'
@@ -566,9 +578,82 @@ function galyleo_launch() {
 }
 
 # ----------------------------------------------------------------------
+# galyleo_configure
+#
+#   Configure galyleo's default global variables.
+#
+# Globals:
+#
+#   GALYLEO_INSTALL_DIR
+#
+# Arguments:
+#
+#   None
+#
+# Returns:
+#
+#   True (0) always.
+#
+# ----------------------------------------------------------------------
+function galyleo_configure() {
+
+  # Declare local variables associated with reverse proxy service.
+  local reverse_proxy_fqdn='expanse-user-content.sdsc.edu'
+  local dns_domain='eth.cluster'
+
+  # Declare default configuration variables associated with scheduler.
+  local partition='shared'
+
+  # Declare default variables associated with Jupyter runtime environment.
+  local jupyter_interface='lab'
+
+  # Read in command-line options and assign input variables to local
+  # variables.
+  while (("${#}" > 0)); do
+    case "${1}" in
+      -r | --reverse-proxy )
+        reverse_proxy_fqdn="${2}"
+        shift 2
+        ;;
+      -D | --dns-domain )
+        dns_domain="${2}"
+        shift 2
+        ;;
+      -p | --partition )
+        partition="${2}"
+        shift 2
+        ;;
+      -j | --jupyter )
+        jupyter_interface="${2}"
+        shift 2
+        ;;
+      *)
+        slog error -m "Command-line option ${1} not recognized or not supported."
+        return 1
+    esac
+  done
+
+  if [[ -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" ]]; then
+    slog error -m 'galyleo.conf cannot be overwritten with this command.'
+    return 1
+  else
+     slog output -m 'Creating galyleo.conf file ... '
+     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m '#!/usr/bin/env sh'
+     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_REVERSE_PROXY_FQDN='${reverse_proxy_fqdn}'"
+     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_DNS_DOMAIN='${dns_domain}'"
+     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_DEFAULT_PARTITION='${partition}'"
+     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_DEFAULT_JUPYTER_INTERFACE='${jupyter_interface}'"
+     slog output -m 'Creation complete.'
+  fi
+
+  return 0
+
+}
+
+# ----------------------------------------------------------------------
 # galyleo_clean
 #
-#   Clean up GALYLEO_CACHE_DIR. 
+#   Clean up the GALYLEO_CACHE_DIR. 
 #
 # Globals:
 #
@@ -613,8 +698,6 @@ function galyleo_help() {
 
   slog output -m 'USAGE: galyleo.sh launch [command-line option] {value}'
   slog output -m ''
-  slog output -m '  command-line option      : value'
-  slog output -m ''
   slog output -m "    -A | --account         : ${account}"
   slog output -m "    -R | --reservation     : ${reservation}"
   slog output -m "    -p | --partition       : ${partition}"
@@ -627,7 +710,7 @@ function galyleo_help() {
   slog output -m "    -G | --gpus            : ${gpus}"
   slog output -m "       | --gres            : ${gres}"
   slog output -m "    -t | --time-limit      : ${time_limit}"
-  slog output -m "    -j | --jupyter         : ${jupyter_user_interface}"
+  slog output -m "    -j | --jupyter         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
   slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
   slog output -m "    -D | --dns-domain      : ${dns_domain}"
@@ -687,6 +770,14 @@ function galyleo() {
       galyleo_launch "${@}"
       if [[ "${?}" -ne 0 ]]; then
         slog error -m 'galyleo_launch command failed.'
+        exit 1
+      fi
+
+    elif [[ "${galyleo_command}" = 'configure' ]]; then
+
+      galyleo_configure "${@}"
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m 'galyleo_configure command failed.'
         exit 1
       fi
 
