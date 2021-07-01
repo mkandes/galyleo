@@ -20,8 +20,8 @@
 #
 # TODO
 #
-#     Add support for other, non-jupyter-based web services; e.g., Spark 
-#       and TensorBoard
+#     Add support for non-jupyter-based web services; 
+#       e.g., Spark and TensorBoard
 #
 # AUTHOR(S)
 #
@@ -127,8 +127,6 @@ function galyleo_launch() {
   local gres=''
   local time_limit='00:30:00'
   local constraint=''
-  local exclude=''
-  local comment='galyleo'
 
   # Declare input variables associated with Jupyter runtime environment.
   local jupyter_user_interface=''
