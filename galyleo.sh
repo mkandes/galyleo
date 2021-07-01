@@ -329,7 +329,7 @@ function galyleo_launch() {
     if [[ ! -d "${jupyter_notebook_dir}" ]]; then
       slog error -m "Jupyter notebook directory does not exist: ${jupyter_notebook_dir}"
     else
-      slog error -m 'Unable to change directory to the Jupyter notebook directory.'
+      slog error -m "Unable to change to the Jupyter notebook directory: ${jupyter_notebook_dir}"
     fi
     return 1
   fi
@@ -361,8 +361,14 @@ function galyleo_launch() {
     fi
   fi
 
-  # Check if the singularity image file specified by the user, if any,
-  # exists. If it does not exist, then halt launch.
+  # Check if the Singularity container image file specified by the user,
+  # if any, exists. If it does not exist, then halt the launch.
+  if [[ -n "${singularity_image_file}" ]]; then
+    if [[ ! -f "${singularity_image_file}" ]]; then
+      slog error -m "Singularity image file does not exist: ${singularity_image_file}"
+      return 1
+    fi
+  fi
 
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
@@ -370,7 +376,7 @@ function galyleo_launch() {
   slog output -m "${http_response}"
   http_status_code="$(echo ${http_response} | awk '{print $NF}')"
   if (( "${http_status_code}" != 200 )); then
-    slog error -m "Unable to connect to the reverse proxy service: ${http_status_code}"
+    slog error -m "Unable to connect to the Satellite reverse proxy service: ${http_status_code}"
     return 1
   fi
 
