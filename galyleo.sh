@@ -105,8 +105,6 @@ fi
 #   -C | --constraint <constraint>
 #   -j | --jupyter <jupyter_interface>
 #   -d | --notebook-dir <jupyter_notebook_dir>
-#   -r | --reverse-proxy <reverse_proxy_fqdn>
-#   -D | --dns-domain <dns_domain>
 #   -s | --sif <singularity_image_file>
 #   -B | --bind <singularity_bind_mounts>
 #      | --nv
@@ -143,10 +141,6 @@ function galyleo_launch() {
   # Declare input variables associated with Jupyter runtime environment.
   local jupyter_interface="${GALYLEO_DEFAULT_JUPYTER_INTERFACE}"
   local jupyter_notebook_dir=''
-
-  # Declare input variable associated with reverse proxy service.
-  local reverse_proxy_fqdn="${GALYLEO_REVERSE_PROXY_FQDN}"
-  local dns_domain="${GALYLEO_DNS_DOMAIN}"
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
@@ -233,14 +227,6 @@ function galyleo_launch() {
         jupyter_notebook_dir="${2}"
         shift 2
         ;;
-      -r | --reverse-proxy )
-        reverse_proxy_fqdn="${2}"
-        shift 2
-        ;;
-      -D | --dns-domain )
-        dns_domain="${2}"
-        shift 2
-        ;;
       -s | --sif )
         singularity_image_file="${2}"
         shift 2
@@ -294,8 +280,6 @@ function galyleo_launch() {
   slog output -m "    -t | --time-limit      : ${time_limit}"
   slog output -m "    -j | --jupyter         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
-  slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
-  slog output -m "    -D | --dns-domain      : ${dns_domain}"
   slog output -m "    -s | --sif             : ${singularity_image_file}"
   slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
   slog output -m "       | --nv              : ${singularity_gpu_type}"
@@ -382,7 +366,7 @@ function galyleo_launch() {
 
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
-  http_response="$(curl -s -w %{http_code} https://manage.${reverse_proxy_fqdn}/getlink.cgi -o -)"
+  http_response="$(curl -s -w %{http_code} https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/getlink.cgi -o -)"
   slog output -m "${http_response}"
   http_status_code="$(echo ${http_response} | awk '{print $NF}')"
   if (( "${http_status_code}" != 200 )); then
@@ -390,10 +374,6 @@ function galyleo_launch() {
     return 1
   fi
 
-  # Export the fully qualified domain name of the reverse proxy host as
-  # a read-only environment variable.
-  declare -xr REVERSE_PROXY_FQDN="${reverse_proxy_fqdn}"
- 
   # Extract the reverse proxy connection token and export it as a
   # read-only environment variable.
   declare -xr REVERSE_PROXY_TOKEN="$(echo ${http_response} | awk 'NF>1{printf $((NF-1))}' -)"
@@ -524,7 +504,7 @@ function galyleo_launch() {
     fi
 
     # Run the Jupyter server process in the backgroud.
-    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${dns_domain}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
+    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${GALYLEO_DNS_DOMAIN}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
     slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
     slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
     slog append -f "${job_name}.sh" -m '  exit 1'
@@ -533,7 +513,7 @@ function galyleo_launch() {
 
     # Redeem the connection token from reverse proxy service to enable
     # proxy mapping.
-    slog append -f "${job_name}.sh" -m 'curl "https://manage.${REVERSE_PROXY_FQDN}/redeemtoken.cgi?token=${REVERSE_PROXY_TOKEN}&port=${JUPYTER_PORT}"'
+    slog append -f "${job_name}.sh" -m 'curl "https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/redeemtoken.cgi?token=${REVERSE_PROXY_TOKEN}&port=${JUPYTER_PORT}"'
     slog append -f "${job_name}.sh" -m ''
 
     # Wait for the Jupyter server to be shutdown by the user.
@@ -542,7 +522,7 @@ function galyleo_launch() {
 
     # Revoke the connection token from reverse proxy service once the
     # Jupyter server has been shutdown.
-    slog append -f "${job_name}.sh" -m 'curl "https://manage.${REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN}"'
+    slog append -f "${job_name}.sh" -m 'curl "https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN}"'
 
   else
 
@@ -555,7 +535,7 @@ function galyleo_launch() {
   job_id="$(sbatch ${job_name}.sh | grep -o '[[:digit:]]*')"
   if [[ "${?}" -ne 0 ]]; then
     slog error -m 'Failed job submission to Slurm.'
-    http_response="$(curl -s https://manage.${REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN})"
+    http_response="$(curl -s https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN})"
     slog output -m "${http_response}"
     return 1
   else
@@ -563,7 +543,7 @@ function galyleo_launch() {
   fi
 
   # Associate batch job id to the connection token from the reverse proxy service.
-  http_response="$(curl -s https://manage.${REVERSE_PROXY_FQDN}/linktoken.cgi?token=${REVERSE_PROXY_TOKEN}\&jobid=${job_id})"
+  http_response="$(curl -s https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/linktoken.cgi?token=${REVERSE_PROXY_TOKEN}\&jobid=${job_id})"
   slog output -m "${http_response}"
 
   # Always print to standard output the URL where the Jupyter notebook 
@@ -571,7 +551,7 @@ function galyleo_launch() {
   slog output -m 'Please copy and paste the HTTPS URL provided below into your web browser.'
   slog output -m 'Do not share this URL with others. It is the password to your Jupyter notebook session.'
   slog output -m 'Your Jupyter notebook session will begin once compute resources are allocated to your Slurm job by the scheduler.'
-  echo "https://${REVERSE_PROXY_TOKEN}.${REVERSE_PROXY_FQDN}?token=${JUPYTER_TOKEN}"
+  echo "https://${REVERSE_PROXY_TOKEN}.${GALYLEO_REVERSE_PROXY_FQDN}?token=${JUPYTER_TOKEN}"
 
   return 0
 
@@ -736,8 +716,6 @@ function galyleo_help() {
   slog output -m "    -t | --time-limit      : ${time_limit}"
   slog output -m "    -j | --jupyter         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
-  slog output -m "    -r | --reverse-proxy   : ${reverse_proxy_fqdn}"
-  slog output -m "    -D | --dns-domain      : ${dns_domain}"
   slog output -m "    -s | --sif             : ${singularity_image_file}"
   slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
   slog output -m "       | --nv              : ${singularity_gpu_type}"
