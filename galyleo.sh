@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Wednesday, June 30th, 2021
+#     Thursday, July 1st, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -580,7 +580,11 @@ function galyleo_launch() {
 # ----------------------------------------------------------------------
 # galyleo_configure
 #
-#   Configure galyleo's default global variables.
+#   Sets the GALYLEO_INSTALL_DIR to a fixed, absolute path and creates a
+#   global configuration file (galyleo.conf), where system-specifc
+#   deployment variables like the fully-qualified domain name of the
+#   Satellite reverse proxy server and the default Slurm partition for
+#   all galyleo launches can be set.
 #
 # Globals:
 #
@@ -588,11 +592,15 @@ function galyleo_launch() {
 #
 # Arguments:
 #
-#   None
+#   -r | --reverse-proxy <reverse_proxy_fqdn>
+#   -D | --dns-domain <dns_domain>
+#   -p | --partition <partition>
+#   -j | --jupyter <jupyter_interface>
 #
 # Returns:
 #
-#   True (0) always.
+#   True (0) if galyleo was configured successfully.
+#   False (1) if galyleo configuration failed.
 #
 # ----------------------------------------------------------------------
 function galyleo_configure() {
@@ -601,7 +609,7 @@ function galyleo_configure() {
   local reverse_proxy_fqdn='expanse-user-content.sdsc.edu'
   local dns_domain='eth.cluster'
 
-  # Declare default configuration variables associated with scheduler.
+  # Declare default variables associated with scheduler.
   local partition='shared'
 
   # Declare default variables associated with Jupyter runtime environment.
@@ -633,18 +641,34 @@ function galyleo_configure() {
     esac
   done
 
+  # If the galyleo configuration file already exists, do not let the
+  # galyleo configure command reconfigure and overwrite it. This is
+  # intended to force the original configuration file owner --- e.g.,
+  # the system administrator who deployed galyleo --- to manually
+  # remove the existing configuration file first. If the configuration
+  # file does not exist yet, then create it.
   if [[ -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" ]]; then
+
     slog error -m 'galyleo.conf cannot be overwritten with this command.'
     return 1
+
   else
+
+     slog output -m 'Setting GALYLEO_INSTALL_DIR ... '
+
+     sed -i "s|\"\${PWD}\"|'${PWD}'|" 'galyleo.sh'
+
      slog output -m 'Creating galyleo.conf file ... '
-     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m '#!/usr/bin/env sh'
-     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_REVERSE_PROXY_FQDN='${reverse_proxy_fqdn}'"
-     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_DNS_DOMAIN='${dns_domain}'"
-     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_DEFAULT_PARTITION='${partition}'"
-     slog append -f "${GALYLEO_INSTALL_DIR}/galyleo.conf" -m "declare -xr GALYLEO_DEFAULT_JUPYTER_INTERFACE='${jupyter_interface}'"
-     slog output -m 'Creation complete.'
+
+     slog append -f 'galyleo.conf' -m '#!/usr/bin/env sh'
+     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_REVERSE_PROXY_FQDN='${reverse_proxy_fqdn}'"
+     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_DNS_DOMAIN='${dns_domain}'"
+     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_DEFAULT_PARTITION='${partition}'"
+     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_DEFAULT_JUPYTER_INTERFACE='${jupyter_interface}'"
+
   fi
+
+  slog output -m 'galyleo configuration complete.'
 
   return 0
 
