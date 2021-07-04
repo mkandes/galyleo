@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Thursday, July 1st, 2021
+#     Sunday, July 4th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -349,7 +349,7 @@ function galyleo_launch() {
   if [[ -n "${conda_env}" ]]; then
     source ~/.bashrc
     conda activate "${conda_env}"
-    if [[ $? -ne 0 ]]; then
+    if [[ "${?}" -ne 0 ]]; then
       slog error -m "conda environment not found: ${conda_env}"
       return 1
     fi
@@ -361,6 +361,45 @@ function galyleo_launch() {
     if [[ ! -f "${singularity_image_file}" ]]; then
       slog error -m "Singularity image file does not exist: ${singularity_image_file}"
       return 1
+    fi
+  fi
+
+  # Check if Jupyter is available within the software environment 
+  # defined by the user. If it is not available, then halt the launch.
+  if [[ -n "${env_modules}" ]]; then
+    IFS=','
+    read -r -a modules <<< "${env_modules}"
+    unset IFS
+    for module in "${modules[@]}"; do
+        module load "${module}"
+    done
+  fi
+
+  if [[ -n "${conda_env}" ]]; then
+    source ~/.bashrc
+    conda activate "${conda_env}"
+  fi
+
+  # If a Singularity container is required, then also check if
+  # Singularity is available within the software environment defined by
+  # the user prior to checking for Jupyter. Otherwise, halt launch.
+  if [[ -n "${singularity_image_file}" ]]; then
+    singularity --version > /dev/null
+    if [[ "${?}" -ne 0 ]]; then
+      slog error -m "No singularity executable was found within the software environment."
+      return 1
+    else
+      singularity exec "${singularity_image_file}" jupyter "${jupyter_interface}" --version > /dev/null
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m "No jupyter executable was found within the singularity container."
+        return 1
+      fi
+    fi
+  else
+    jupyter "${jupyter_interface}" --version > /dev/null
+    if [[ "${?}" -ne 0 ]]; then
+        slog error -m "No jupyter executable was found within the software environment."
+        return 1
     fi
   fi
 
