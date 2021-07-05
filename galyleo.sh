@@ -447,10 +447,18 @@ function galyleo_launch() {
 
     slog append -f "${job_name}.sh" -m '#!/usr/bin/env sh'
     slog append -f "${job_name}.sh" -m ''
-    slog append -f "${job_name}.sh" -m "#SBATCH --job-name=${job_name}"
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --job-name=${job_name}"
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m "#PBS -N ${job_name}"
+    fi
 
     if [[ -n "${account}" ]]; then
-      slog append -f "${job_name}.sh" -m "#SBATCH --account=${account}"
+      if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --account=${account}"
+      elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+        slog append -f "${job_name}.sh" -m "#PBS -A ${account}"
+      fi
     else
       slog error -m 'No account specified. Every job must be charged to an account.'
       rm "${job_name}.sh"
@@ -458,39 +466,79 @@ function galyleo_launch() {
     fi
 
     if [[ -n "${reservation}" ]]; then
-      slog append -f "${job_name}.sh" -m "#SBATCH --reservation=${reservation}"
+      if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --reservation=${reservation}"
+      fi
     fi
 
     if [[ -n "${qos}" ]]; then
-      slog append -f "${job_name}.sh" -m "#SBATCH --qos=${qos}"
+      if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --qos=${qos}"
+      elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+        slog append -f "${job_name}.sh" -m "#PBS -l qos=${qos}"
+      fi
     fi
 
-    slog append -f "${job_name}.sh" -m "#SBATCH --partition=${partition}"
-    slog append -f "${job_name}.sh" -m "#SBATCH --nodes=${nodes}"
-    slog append -f "${job_name}.sh" -m "#SBATCH --ntasks-per-node=${ntasks_per_node}"
-    slog append -f "${job_name}.sh" -m "#SBATCH --cpus-per-task=${cpus_per_task}"
-
-    if (( "${memory_per_node}" > 0 )); then
-      slog append -f "${job_name}.sh" -m "#SBATCH --mem=${memory_per_node}G"
-    else
-      slog append -f "${job_name}.sh" -m "#SBATCH --mem-per-cpu=${memory_per_cpu}G"
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --partition=${partition}"
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m "#PBS -q ${partition}"
     fi
 
-    if [[ -n "${gpus}" && -z "${gres}" ]]; then
-      slog append -f "${job_name}.sh" -m "#SBATCH --gpus=${gpus}"
-    elif [[ -z "${gpus}" && -n "${gres}" ]]; then
-      slog append -f "${job_name}.sh" -m "#SBATCH --gres=${gres}"
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --nodes=${nodes}"
+      slog append -f "${job_name}.sh" -m "#SBATCH --ntasks-per-node=${ntasks_per_node}"
+      slog append -f "${job_name}.sh" -m "#SBATCH --cpus-per-task=${cpus_per_task}"
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${ntasks_per_node}"
     fi
 
-    slog append -f "${job_name}.sh" -m "#SBATCH --time=${time_limit}"
-
-    if [[ -n "${constraint}" ]]; then
-      slog append -f "${job_name}.sh" -m "#SBATCH --constraint=${constraint}"
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      if (( "${memory_per_node}" > 0 )); then
+        slog append -f "${job_name}.sh" -m "#SBATCH --mem=${memory_per_node}G"
+      else
+        slog append -f "${job_name}.sh" -m "#SBATCH --mem-per-cpu=${memory_per_cpu}G"
+      fi
     fi
 
-    slog append -f "${job_name}.sh" -m "#SBATCH --no-requeue"
-    slog append -f "${job_name}.sh" -m "#SBATCH --export=ALL"
-    slog append -f "${job_name}.sh" -m "#SBATCH --output=${job_name}.o%j.%N"
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      if [[ -n "${gpus}" && -z "${gres}" ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --gpus=${gpus}"
+      elif [[ -z "${gpus}" && -n "${gres}" ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --gres=${gres}"
+      fi
+    fi
+
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --time=${time_limit}"
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m "#PBS -l walltime=${time_limit}"
+    fi
+
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      if [[ -n "${constraint}" ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --constraint=${constraint}"
+      fi
+    fi
+
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --no-requeue"
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m "#PBS -r n"
+    fi
+
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --export=ALL"
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m "#PBS -V"
+    fi
+
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --output=${job_name}.o%j.%N"
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m "#PBS -j oe"
+    fi
+
     slog append -f "${job_name}.sh" -m ''
 
     slog append -f "${job_name}.sh" -m 'declare -xr JUPYTER_RUNTIME_DIR="${HOME}/.jupyter/runtime"'
@@ -570,15 +618,27 @@ function galyleo_launch() {
 
   fi
 
-  # Submit Jupyter launch script to Slurm.
-  job_id="$(sbatch ${job_name}.sh | grep -o '[[:digit:]]*')"
-  if [[ "${?}" -ne 0 ]]; then
-    slog error -m 'Failed job submission to Slurm.'
-    http_response="$(curl -s https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN})"
-    slog output -m "${http_response}"
-    return 1
-  else
-    slog output -m "Submitted Jupyter launch script to Slurm. Your SLURM_JOB_ID is ${job_id}."
+  # Submit Jupyter launch script to scheduler.
+  if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+    job_id="$(sbatch ${job_name}.sh | grep -o '[[:digit:]]*')"
+    if [[ "${?}" -ne 0 ]]; then
+      slog error -m 'Failed job submission to Slurm.'
+      http_response="$(curl -s https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN})"
+      slog output -m "${http_response}"
+      return 1
+    else
+      slog output -m "Submitted Jupyter launch script to Slurm. Your SLURM_JOB_ID is ${job_id}."
+    fi
+  elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+    job_id="$(qsub ${job_name}.sh | grep -o '^[[:digit:]]*')"
+    if [[ "${?}" -ne 0 ]]; then
+      slog error -m 'Failed job submission to PBS.'
+      http_response="$(curl -s https://manage.${GALYLEO_REVERSE_PROXY_FQDN}/destroytoken.cgi?token=${REVERSE_PROXY_TOKEN})"
+      slog output -m "${http_response}"
+      return 1
+    else
+      slog output -m "Submitted Jupyter launch script to PBS. Your PBS_JOBID is ${job_id}."
+    fi
   fi
 
   # Associate batch job id to the connection token from the reverse proxy service.
@@ -589,7 +649,7 @@ function galyleo_launch() {
   # server may be accessed by the user.
   slog output -m 'Please copy and paste the HTTPS URL provided below into your web browser.'
   slog output -m 'Do not share this URL with others. It is the password to your Jupyter notebook session.'
-  slog output -m 'Your Jupyter notebook session will begin once compute resources are allocated to your Slurm job by the scheduler.'
+  slog output -m 'Your Jupyter notebook session will begin once compute resources are allocated to your job by the scheduler.'
   echo "https://${REVERSE_PROXY_TOKEN}.${GALYLEO_REVERSE_PROXY_FQDN}?token=${JUPYTER_TOKEN}"
 
   return 0
