@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Sunday, July 4th, 2021
+#     Wednesday, July 7th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -278,6 +278,7 @@ function galyleo_launch() {
   slog output -m "    -G | --gpus            : ${gpus}"
   slog output -m "       | --gres            : ${gres}"
   slog output -m "    -t | --time-limit      : ${time_limit}"
+  slog output -m "    -C | --constraint      : ${constraint}"
   slog output -m "    -j | --jupyter         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
   slog output -m "    -s | --sif             : ${singularity_image_file}"
@@ -489,8 +490,15 @@ function galyleo_launch() {
       slog append -f "${job_name}.sh" -m "#SBATCH --nodes=${nodes}"
       slog append -f "${job_name}.sh" -m "#SBATCH --ntasks-per-node=${ntasks_per_node}"
       slog append -f "${job_name}.sh" -m "#SBATCH --cpus-per-task=${cpus_per_task}"
+      if [[ -n "${constraint}" ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --constraint=${constraint}"
+      fi
     elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
-      slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${ntasks_per_node}"
+      if [[ -n "${constraint}" ]]; then
+        slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${ntasks_per_node}:${constraint}"
+      else
+        slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${ntasks_per_node}"
+      fi
     fi
 
     if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
@@ -513,12 +521,6 @@ function galyleo_launch() {
       slog append -f "${job_name}.sh" -m "#SBATCH --time=${time_limit}"
     elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
       slog append -f "${job_name}.sh" -m "#PBS -l walltime=${time_limit}"
-    fi
-
-    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
-      if [[ -n "${constraint}" ]]; then
-        slog append -f "${job_name}.sh" -m "#SBATCH --constraint=${constraint}"
-      fi
     fi
 
     if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
