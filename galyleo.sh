@@ -508,7 +508,9 @@ function galyleo_launch() {
         slog append -f "${job_name}.sh" -m "#SBATCH --mem-per-cpu=${memory_per_cpu}G"
       fi
     elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
-      slog append -f "${job_name}.sh" -m "#PBS -l mem=${memory_per_node}gb"
+      if (( "${memory_per_node}" > 0 )); then
+        slog append -f "${job_name}.sh" -m "#PBS -l mem=${memory_per_node}gb"
+      fi
     fi
 
     if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
