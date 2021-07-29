@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Wednesday, July 7th, 2021
+#     Thursday, July 29th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -569,6 +569,10 @@ function galyleo_launch() {
       slog append -f "${job_name}.sh" -m 'source ~/.bashrc'
       slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
     fi
+    slog append -f "${job_name}.sh" -m ''
+
+    # Change job working directory (from GALYLEO_CACHE_DIR) to jupyter_notebook_dir.
+    slog append -f "${job_name}.sh" -m "cd ${jupyter_notebook_dir}"
     slog append -f "${job_name}.sh" -m ''
 
     # Choose an open ephemeral port at random.

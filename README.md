@@ -12,30 +12,38 @@ sometime in the next few months.
 
 ## How to use galyleo on Expanse
 
-Example 1: Launch a Jupyter Notebook session on a single CPU core in the 
-'shared' partition on Expanse using the 'base' Anaconda3 software 
-environment provided as part of Expanse's standard software modules.
+First, prepend the installation location of the `galyleo.sh` launch 
+script to your `PATH` environment variable.
 ```bash
 export PATH="/cm/shared/apps/sdsc/galyleo:${PATH}"
-galyleo.sh launch --account 'abc123' --partition 'shared' --cpus-per-task 1 --memory-per-node 1 --time-limit 00:30:00 --jupyter 'notebook' --notebook-dir "/expanse/lustre/projects/abc123/${USER}" --env-modules 'cpu,gcc,anaconda3' --conda-env 'base' --quiet
 ```
 
-Example 2: Launch a JupyterLab session on a single GPU in the 
+Example 1: Launch a JupyterLab session on a single CPU core in the 
+'shared' partition on Expanse using the default Anaconda3 distribution
+provided as part of Expanse's standard software module environment.
+```bash
+export PATH="/cm/shared/apps/sdsc/galyleo:${PATH}"
+galyleo.sh launch --account 'abc123' --partition 'shared' --cpus-per-task 1 --time-limit 00:30:00 --env-modules 'cpu,gcc,anaconda3' --quiet
+```
+
+Example 2: Launch a Jupyter Notebook session on a single GPU in the 
 'gpu-shared' partition on Expanse using the latest PyTorch Singularity 
 container available.
 ```bash
-export PATH="/cm/shared/apps/sdsc/galyleo:${PATH}"
-galyleo.sh launch --account 'abc123' --partition 'gpu-shared' --cpus-per-task 10 --memory-per-node 93 --gpus 1 --time-limit 00:30:00 --jupyter 'lab' --notebook-dir "/expanse/lustre/projects/abc123/${USER}" --env-modules 'singularitypro' --sif '/cm/shared/apps/containers/singularity/pytorch/pytorch-gpu.sif' --bind '/expanse,/scratch' --nv --quiet
+galyleo.sh launch --account 'abc123' --partition 'gpu-shared' --cpus-per-task 10 --memory-per-node 93 --gpus 1 --time-limit 00:30:00 --jupyter 'notebook' --notebook-dir "/expanse/lustre/projects/abc123/${USER}" --env-modules 'singularitypro' --sif '/cm/shared/apps/containers/singularity/pytorch/pytorch-latest.sif' --bind '/expanse,/scratch' --nv --quiet
 ```
 
 ## Status
 
 This project is currently a prototype under active development at 
 [SDSC](https://www.sdsc.edu), where it is currently deployed on both 
-[Comet](https://www.sdsc.edu/support/user_guides/comet.html) and 
-[Expanse](https://expanse.sdsc.edu). It has been integrated with the 
-Open OnDemand-based [Expanse Portal](https://portal.expanse.sdsc.edu)
-to simplify launching Jupyter notebooks on Expanse.
+[Comet](https://www.sdsc.edu/support/user_guides/comet.html), 
+[Expanse](https://expanse.sdsc.edu), and the 
+[Triton Shared Compute Cluster (TSCC)](https://www.sdsc.edu/support/user_guides/tscc.html). It has also been integrated with 
+the Open OnDemand-based [Expanse User Portal](https://portal.expanse.sdsc.edu)
+to help simplify the launching Jupyter notebooks on Expanse. Please see
+*Interactive Apps* tab in the toolbar across the top of your browser 
+after logging into the portal, then select *Jupyter*.
 
 ## Contribute
 
@@ -53,8 +61,8 @@ University of California, San Diego
 
 ## Version
 
-0.4.0
+0.4.1
 
 ## Last Updated
 
-Thursday, July 8th, 2021
+Thursday, July 29th, 2021
