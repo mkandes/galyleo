@@ -22,7 +22,6 @@ Example 1: Launch a JupyterLab session on a single CPU core in the
 'shared' partition on Expanse using the default Anaconda3 distribution
 provided as part of Expanse's standard software module environment.
 ```bash
-export PATH="/cm/shared/apps/sdsc/galyleo:${PATH}"
 galyleo.sh launch --account 'abc123' --partition 'shared' --cpus-per-task 1 --time-limit 00:30:00 --env-modules 'cpu,gcc,anaconda3' --quiet
 ```
 
@@ -61,7 +60,7 @@ University of California, San Diego
 
 ## Version
 
-0.4.1
+0.4.2
 
 ## Last Updated
 
