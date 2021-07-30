@@ -390,9 +390,9 @@ function galyleo_launch() {
       slog error -m "No singularity executable was found within the software environment."
       return 1
     else
-      singularity exec "${singularity_image_file}" jupyter "${jupyter_interface}" --version > /dev/null
+      timeout 10 singularity exec "${singularity_image_file}" jupyter "${jupyter_interface}" --version > /dev/null
       if [[ "${?}" -ne 0 ]]; then
-        slog error -m "No jupyter executable was found within the singularity container."
+        slog error -m "Either no jupyter executable was found within the singularity container OR the process used to check for the jupyter executable within the container may have hung and then timed out."
         return 1
       fi
     fi
