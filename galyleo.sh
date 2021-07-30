@@ -317,15 +317,18 @@ function galyleo_launch() {
     jupyter_notebook_dir="${HOME}"
   fi
 
-  # Change the present working directory to the Jupyter notebook
-  # directory. If the directory does not exist, then halt the launch.
-  cd "${jupyter_notebook_dir}"
-  if [[ "${?}" -ne 0 ]]; then
-    if [[ ! -d "${jupyter_notebook_dir}" ]]; then
-      slog error -m "Jupyter notebook directory does not exist: ${jupyter_notebook_dir}"
-    else
-      slog error -m "Unable to change to the Jupyter notebook directory: ${jupyter_notebook_dir}"
-    fi
+  # Check if the Jupyter notebook directory exists. If it does not
+  # exist, then halt the launch.
+  if [[ ! -d "${jupyter_notebook_dir}" ]]; then
+    slog error -m "Jupyter notebook directory does not exist: ${jupyter_notebook_dir}"
+    return 1
+  fi
+ 
+  # Check if the user has write permissions within the Jupyter notebook
+  # directory. If the user does not have write permissions, then halt
+  # the launch.
+  if [[ ! -w "${jupyter_notebook_dir}" ]]; then
+    slog error -m "Jupyter notebook directory exists, but you do not have write permissions: ${jupyter_notebook_dir}"
     return 1
   fi
 
