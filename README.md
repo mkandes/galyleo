@@ -22,14 +22,14 @@ Example 1: Launch a JupyterLab session on a single CPU core in the
 'shared' partition on Expanse using the default Anaconda3 distribution
 provided as part of Expanse's standard software module environment.
 ```bash
-galyleo.sh launch --account 'abc123' --partition 'shared' --cpus-per-task 1 --time-limit 00:30:00 --env-modules 'cpu,gcc,anaconda3' --quiet
+galyleo launch --account 'abc123' --partition 'shared' --cpus 1 --memory 2 --time-limit 00:30:00 --env-modules 'cpu,gcc,anaconda3' --quiet
 ```
 
 Example 2: Launch a Jupyter Notebook session on a single GPU in the 
 'gpu-shared' partition on Expanse using the latest PyTorch Singularity 
 container available.
 ```bash
-galyleo.sh launch --account 'abc123' --partition 'gpu-shared' --cpus-per-task 10 --memory-per-node 93 --gpus 1 --time-limit 00:30:00 --jupyter 'notebook' --notebook-dir "/expanse/lustre/projects/abc123/${USER}" --env-modules 'singularitypro' --sif '/cm/shared/apps/containers/singularity/pytorch/pytorch-latest.sif' --bind '/expanse,/scratch' --nv --quiet
+galyleo launch --account 'abc123' --partition 'gpu-shared' --cpus 10 --memory 93 --gpus 1 --time-limit 00:30:00 --notebook-dir "/expanse/lustre/projects/abc123/${USER}" --env-modules 'singularitypro' --sif '/cm/shared/apps/containers/singularity/pytorch/pytorch-latest.sif' --bind '/expanse,/scratch' --nv --quiet
 ```
 
 ## Status
@@ -60,8 +60,8 @@ University of California, San Diego
 
 ## Version
 
-0.4.4
+0.4.5
 
 ## Last Updated
 
-Thursday, July 29th, 2021
+Friday, July 30th, 2021
