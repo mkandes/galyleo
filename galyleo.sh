@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Friday, July 30th, 2021
+#     Tuesday, August 3rd, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -130,7 +130,7 @@ function galyleo_launch() {
   local -i nodes=1
   local -i ntasks_per_node=1
   local -i cpus_per_task=1
-  local -i memory_per_node=2
+  local -i memory_per_node=-1
   local gpus=''
   local gres=''
   local time_limit='00:30:00'
@@ -497,10 +497,12 @@ function galyleo_launch() {
       fi
     fi
 
-    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
-      slog append -f "${job_name}.sh" -m "#SBATCH --mem=${memory_per_node}G"
-    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
-      slog append -f "${job_name}.sh" -m "#PBS -l mem=${memory_per_node}gb"
+    if (( "${memory_per_node}" > 0 )); then
+      if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+        slog append -f "${job_name}.sh" -m "#SBATCH --mem=${memory_per_node}G"
+      elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+        slog append -f "${job_name}.sh" -m "#PBS -l mem=${memory_per_node}gb"
+      fi
     fi
 
     if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
