@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Tuesday, August 3rd, 2021
+#     Thursday, August 12th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -108,6 +108,7 @@ fi
 #   -B | --bind <singularity_bind_mounts>
 #      | --nv
 #   -e | --env-modules <env_modules>
+#      | --conda-init <conda_init>
 #      | --conda-env <conda_env>
 #   -Q | --quiet
 #
@@ -149,6 +150,7 @@ function galyleo_launch() {
   local env_modules=''
 
   # Declare input variables associated with conda environments.
+  local conda_init=''
   local conda_env=''
 
   # Declare internal galyelo_launch variables not affected by input variables.
@@ -241,6 +243,10 @@ function galyleo_launch() {
         env_modules="${2}"
         shift 2
         ;;
+      --conda-init )
+        conda_init="${2}"
+        shift 2
+        ;;
       --conda-env )
         conda_env="${2}"
         shift 2
@@ -278,6 +284,7 @@ function galyleo_launch() {
   slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
   slog output -m "       | --nv              : ${singularity_gpu_type}"
   slog output -m "    -e | --env-modules     : ${env_modules}"
+  slog output -m "       | --conda-init      : ${conda_init}"
   slog output -m "       | --conda-env       : ${conda_env}"
   slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
 
@@ -340,16 +347,22 @@ function galyleo_launch() {
     done
   fi
 
-  # Check if the conda environment specified by the user, if any, has
-  # been initialized, configured in the user's .bashrc file, and can be
-  # activated successfully. If not, then halt the launch.
+  # Check if the conda environment specified by the user, if any, can be
+  # initialized and activated successfully. If not, then halt the launch.
   if [[ -n "${conda_env}" ]]; then
-    source ~/.bashrc
+
+    if [[ -n "${conda_init}" ]]; then
+      source "${conda_init}"
+    else
+      source ~/.bashrc
+    fi
+
     conda activate "${conda_env}"
     if [[ "${?}" -ne 0 ]]; then
       slog error -m "conda environment not found: ${conda_env}"
       return 1
     fi
+
   fi
 
   # Check if the Singularity container image file specified by the user,
