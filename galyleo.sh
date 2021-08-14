@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Thursday, August 12th, 2021
+#     Saturday, August 14th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -89,26 +89,25 @@ fi
 #
 # Arguments:
 #
-#      | --mode <mode>
 #   -A | --account <account>
 #   -R | --reservation <reservation>
 #   -p | --partition <partition>
 #   -q | --qos <qos>
-#   -N | --nodes <nodes>
-#   -n | --ntasks-per-node <ntasks_per_node>
-#   -c | --cpus | --cpus-per-task <cpus_per_task>
-#   -m | -M | --memory | --memory-per-node <memory_per_node> (in units of GB)
-#   -g | -G | --gpus <gpus>
+#   -c | --cpus <cpus_per_task>
+#   -m | --memory <memory_per_node> (in units of GB)
+#   -g | --gpus <gpus>
 #      | --gres <gres>
 #   -t | --time-limit <time_limit>
 #   -C | --constraint <constraint>
 #   -j | --jupyter <jupyter_interface>
 #   -d | --notebook-dir <jupyter_notebook_dir>
+#      | --scratch-dir <local_scratch_dir>
+#   -e | --env-modules <env_modules>
 #   -s | --sif <singularity_image_file>
 #   -B | --bind <singularity_bind_mounts>
 #      | --nv
-#   -e | --env-modules <env_modules>
 #      | --conda-init <conda_init>
+#      | --conda-pack <conda_pack>
 #      | --conda-env <conda_env>
 #   -Q | --quiet
 #
@@ -141,16 +140,20 @@ function galyleo_launch() {
   local jupyter_interface="${GALYLEO_DEFAULT_JUPYTER_INTERFACE}"
   local jupyter_notebook_dir=''
 
+  # Declare input variables associated with system architecture.
+  local local_scratch_dir=''
+
+  # Declare input variables associated with environment modules.
+  local env_modules=''
+
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
   local singularity_bind_mounts=''
   local singularity_gpu_type=''
 
-  # Declare input variables associated with environment modules.
-  local env_modules=''
-
   # Declare input variables associated with conda environments.
   local conda_init=''
+  local conda_pack=''
   local conda_env=''
 
   # Declare internal galyelo_launch variables not affected by input variables.
@@ -223,6 +226,14 @@ function galyleo_launch() {
         jupyter_notebook_dir="${2}"
         shift 2
         ;;
+      --scratch-dir )
+        local_scratch_dir="${2}"
+        shift 2
+        ;;
+      -e | --env-modules )
+        env_modules="${2}"
+        shift 2
+        ;;
       -s | --sif )
         singularity_image_file="${2}"
         shift 2
@@ -239,12 +250,12 @@ function galyleo_launch() {
         singularity_gpu_type='rocm'
         shift 1
         ;;
-      -e | --env-modules )
-        env_modules="${2}"
-        shift 2
-        ;;
       --conda-init )
         conda_init="${2}"
+        shift 2
+        ;;
+      --conda-pack )
+        conda_pack="${2}"
         shift 2
         ;;
       --conda-env )
@@ -262,31 +273,35 @@ function galyleo_launch() {
   done
 
   # Print all command-line options read in for launch to standard output.
+  slog output -m ''
   slog output -m 'Preparing galyleo for launch into Jupyter orbit ...'
-  slog output -m 'Listing all launch parameters ...'
-  slog output -m '  command-line option      : value'
-  slog output -m "       | --mode            : ${mode}"
-  slog output -m "    -A | --account         : ${account}"
-  slog output -m "    -R | --reservation     : ${reservation}"
-  slog output -m "    -p | --partition       : ${partition}"
-  slog output -m "    -q | --qos             : ${qos}"
-  slog output -m "    -N | --nodes           : ${nodes}"
-  slog output -m "    -n | --ntasks-per-node : ${ntasks_per_node}"
-  slog output -m "    -c | --cpus | --cpus-per-task : ${cpus_per_task}"
-  slog output -m "    -m | -M | --memory | --memory-per-node : ${memory_per_node} GB"
-  slog output -m "    -g | -G | --gpus       : ${gpus}"
-  slog output -m "       | --gres            : ${gres}"
-  slog output -m "    -t | --time-limit      : ${time_limit}"
-  slog output -m "    -C | --constraint      : ${constraint}"
-  slog output -m "    -j | --jupyter         : ${jupyter_interface}"
-  slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
-  slog output -m "    -s | --sif             : ${singularity_image_file}"
-  slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
-  slog output -m "       | --nv              : ${singularity_gpu_type}"
-  slog output -m "    -e | --env-modules     : ${env_modules}"
-  slog output -m "       | --conda-init      : ${conda_init}"
-  slog output -m "       | --conda-env       : ${conda_env}"
-  slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
+  slog output -m ''
+  slog output -m '  Listing all launch parameters ...'
+  slog output -m ''
+  slog output -m '    command-line options  : values'
+  slog output -m ''
+  slog output -m "      -A | --account      : ${account}"
+  slog output -m "      -R | --reservation  : ${reservation}"
+  slog output -m "      -p | --partition    : ${partition}"
+  slog output -m "      -q | --qos          : ${qos}"
+  slog output -m "      -c | --cpus         : ${cpus_per_task}"
+  slog output -m "      -m | --memory       : ${memory_per_node} GB"
+  slog output -m "      -g | --gpus         : ${gpus}"
+  slog output -m "         | --gres         : ${gres}"
+  slog output -m "      -t | --time-limit   : ${time_limit}"
+  slog output -m "      -C | --constraint   : ${constraint}"
+  slog output -m "      -j | --jupyter      : ${jupyter_interface}"
+  slog output -m "      -d | --notebook-dir : ${jupyter_notebook_dir}"
+  slog output -m "         | --scratch-dir  : ${local_scratch_dir}"
+  slog output -m "      -e | --env-modules  : ${env_modules}"
+  slog output -m "      -s | --sif          : ${singularity_image_file}"
+  slog output -m "      -B | --bind         : ${singularity_bind_mounts}"
+  slog output -m "         | --nv           : ${singularity_gpu_type}"
+  slog output -m "         | --conda-init   : ${conda_init}"
+  slog output -m "         | --conda-pack   : ${conda_pack}"
+  slog output -m "         | --conda-env    : ${conda_env}"
+  slog output -m "      -Q | --quiet        : ${SLOG_LEVEL}"
+  slog output -m ''
 
   # Check if the user specified a Jupyter user interface. If the user
   # did not specify a user interface, then set JupyterLab ('lab') as the
@@ -350,19 +365,23 @@ function galyleo_launch() {
   # Check if the conda environment specified by the user, if any, can be
   # initialized and activated successfully. If not, then halt the launch.
   if [[ -n "${conda_env}" ]]; then
-
-    if [[ -n "${conda_init}" ]]; then
-      source "${conda_init}"
+    if [[ -z "${conda_pack}" ]]; then
+      if [[ -n "${conda_init}" ]]; then
+        source "${conda_init}"
+      else
+        source ~/.bashrc
+      fi
+      conda activate "${conda_env}"
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m "conda environment could not be activated: ${conda_env}"
+        return 1
+      fi
     else
-      source ~/.bashrc
+      if [[ ! -f "${conda_pack}" ]]; then
+        slog error -m "conda environment package file not found: ${conda_pack}"
+        return 1
+      fi
     fi
-
-    conda activate "${conda_env}"
-    if [[ "${?}" -ne 0 ]]; then
-      slog error -m "conda environment not found: ${conda_env}"
-      return 1
-    fi
-
   fi
 
   # Check if the Singularity container image file specified by the user,
@@ -375,24 +394,10 @@ function galyleo_launch() {
   fi
 
   # Check if Jupyter is available within the software environment 
-  # defined by the user. If it is not available, then halt the launch.
-  if [[ -n "${env_modules}" ]]; then
-    IFS=','
-    read -r -a modules <<< "${env_modules}"
-    unset IFS
-    for module in "${modules[@]}"; do
-        module load "${module}"
-    done
-  fi
-
-  if [[ -n "${conda_env}" ]]; then
-    source ~/.bashrc
-    conda activate "${conda_env}"
-  fi
-
-  # If a Singularity container is required, then also check if
-  # Singularity is available within the software environment defined by
-  # the user prior to checking for Jupyter. Otherwise, halt launch.
+  # defined by the user. If a Singularity container is required, then
+  # also check if the singularity executable is available within the
+  # environment defined by the user prior to checking for Jupyter.
+  # Otherwise, halt the launch.
   if [[ -n "${singularity_image_file}" ]]; then
     singularity --version > /dev/null
     if [[ "${?}" -ne 0 ]]; then
@@ -406,10 +411,14 @@ function galyleo_launch() {
       fi
     fi
   else
-    jupyter "${jupyter_interface}" --version > /dev/null
-    if [[ "${?}" -ne 0 ]]; then
-        slog error -m "No jupyter executable was found within the software environment."
-        return 1
+    if [[ -z "${conda_pack}" ]]; then
+      jupyter "${jupyter_interface}" --version > /dev/null
+      if [[ "${?}" -ne 0 ]]; then
+          slog error -m "No jupyter executable was found within the software environment."
+          return 1
+      fi
+    else
+      slog warning -m "Using a packaged conda environment; cannot check if Jupyter is available prior to launch."
     fi
   fi
 
@@ -445,13 +454,14 @@ function galyleo_launch() {
     chmod g-rwx "${GALYLEO_CACHE_DIR}"
     chmod o-rwx "${GALYLEO_CACHE_DIR}"
     if [[ "${?}" -ne 0 ]]; then
-      slog error -m "Failed to create GALYLEO_CACHE_DIR at ${GALYLEO_CACHE_DIR}."
+      slog error -m "Failed to create GALYLEO_CACHE_DIR: ${GALYLEO_CACHE_DIR}"
       return 1
     fi
   fi
   cd "${GALYLEO_CACHE_DIR}"
 
   # Generate a Jupyter launch script.
+  slog output -m ''
   slog output -m 'Generating Jupyter launch script ...'
   if [[ ! -f "${job_name}.sh" ]]; then
 
@@ -552,6 +562,9 @@ function galyleo_launch() {
 
     slog append -f "${job_name}.sh" -m ''
 
+    slog append -f "${job_name}.sh" -m "declare -xr LOCAL_SCRATCH_DIR=${local_scratch_dir}"
+    slog append -f "${job_name}.sh" -m ''
+
     slog append -f "${job_name}.sh" -m 'declare -xr JUPYTER_RUNTIME_DIR="${HOME}/.jupyter/runtime"'
     slog append -f "${job_name}.sh" -m 'declare -xi JUPYTER_PORT=-1'
     slog append -f "${job_name}.sh" -m 'declare -xir LOWEST_EPHEMERAL_PORT=49152'
@@ -571,8 +584,20 @@ function galyleo_launch() {
 
     # Activate a conda environment specified by the user.
     if [[ -n "${conda_env}" ]]; then
-      slog append -f "${job_name}.sh" -m 'source ~/.bashrc'
-      slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
+      if [[ -z "${conda_pack}" ]]; then
+        if [[ -n "${conda_init}" ]]; then
+          slog append -f "${job_name}.sh" -m "source ${conda_init}"
+        else
+          slog append -f "${job_name}.sh" -m 'source ~/.bashrc'
+        fi
+        slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
+      else
+        slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
+        slog append -f "${job_name}.sh" -m "mkdir -p ${conda_env}"
+        slog append -f "${job_name}.sh" -m "tar -xf ${conda_pack} -C ${conda_env}"
+        slog append -f "${job_name}.sh" -m "source ${conda_env}/bin/activate"
+        slog append -f "${job_name}.sh" -m 'conda-unpack'
+      fi
     fi
     slog append -f "${job_name}.sh" -m ''
 
@@ -820,27 +845,32 @@ function galyleo_clean() {
 # ----------------------------------------------------------------------
 function galyleo_help() {
 
-  slog output -m 'USAGE: galyleo.sh launch [command-line option] {value}'
   slog output -m ''
-  slog output -m "    -A | --account         : ${account}"
-  slog output -m "    -R | --reservation     : ${reservation}"
-  slog output -m "    -p | --partition       : ${partition}"
-  slog output -m "    -q | --qos             : ${qos}"
-  slog output -m "    -N | --nodes           : ${nodes}"
-  slog output -m "    -n | --ntasks-per-node : ${ntasks_per_node}"
-  slog output -m "    -c | --cpus | --cpus-per-task : ${cpus_per_task}"
-  slog output -m "    -m | -M | --memory | --memory-per-node : ${memory_per_node} GB"
-  slog output -m "    -g | -G | --gpus            : ${gpus}"
-  slog output -m "       | --gres            : ${gres}"
-  slog output -m "    -t | --time-limit      : ${time_limit}"
-  slog output -m "    -j | --jupyter         : ${jupyter_interface}"
-  slog output -m "    -d | --notebook-dir    : ${jupyter_notebook_dir}"
-  slog output -m "    -s | --sif             : ${singularity_image_file}"
-  slog output -m "    -B | --bind            : ${singularity_bind_mounts}"
-  slog output -m "       | --nv              : ${singularity_gpu_type}"
-  slog output -m "    -e | --env-modules     : ${env_modules}"
-  slog output -m "       | --conda-env       : ${conda_env}"
-  slog output -m "    -Q | --quiet           : ${SLOG_LEVEL}"
+  slog output -m 'USAGE: galyleo launch [command-line option] {value}'
+  slog output -m ''
+  slog output -m '  command-line options  : (default) values'
+  slog output -m ''
+  slog output -m "    -A | --account      : ${account}"
+  slog output -m "    -R | --reservation  : ${reservation}"
+  slog output -m "    -p | --partition    : ${partition}"
+  slog output -m "    -q | --qos          : ${qos}"
+  slog output -m "    -c | --cpus         : ${cpus_per_task}"
+  slog output -m "    -m | --memory       : ${memory_per_node} GB"
+  slog output -m "    -g | --gpus         : ${gpus}"
+  slog output -m "       | --gres         : ${gres}"
+  slog output -m "    -t | --time-limit   : ${time_limit}"
+  slog output -m "    -j | --jupyter      : ${jupyter_interface}"
+  slog output -m "    -d | --notebook-dir : ${jupyter_notebook_dir}"
+  slog output -m "       | --scratch-dir  : ${local_scratch_dir}"
+  slog output -m "    -e | --env-modules  : ${env_modules}"
+  slog output -m "    -s | --sif          : ${singularity_image_file}"
+  slog output -m "    -B | --bind         : ${singularity_bind_mounts}"
+  slog output -m "       | --nv           : ${singularity_gpu_type}"
+  slog output -m "    -e | --env-modules  : ${env_modules}"
+  slog output -m "       | --conda-init   : ${conda_init}"
+  slog output -m "       | --conda-pack   : ${conda_pack}"
+  slog output -m "       | --conda-env    : ${conda_env}"
+  slog output -m "    -Q | --quiet        : ${SLOG_LEVEL}"
   slog output -m ''
 
   return 0

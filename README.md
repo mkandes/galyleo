@@ -1,7 +1,7 @@
 # galyleo
 
 A shell utility to help you launch [Jupyter](https://jupyter.org) 
-notebooks on a remote system in a secure way. 
+notebooks in a secure way.
 
 ## Download and configure galyleo with Satellite
 
@@ -60,8 +60,8 @@ University of California, San Diego
 
 ## Version
 
-0.4.8
+0.4.9
 
 ## Last Updated
 
-Thursday, August 12th, 2021
+Saturday, August 14th, 2021
