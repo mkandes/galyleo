@@ -7,8 +7,8 @@
 #
 # DESCRIPTION
 #
-#     A shell utility to help you launch Jupyter notebooks on a remote
-#     system in a secure way.
+#     A shell utility to help you launch Jupyter notebooks in a simple,
+#     secure way.
 #
 # USAGE
 #
@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Saturday, August 14th, 2021
+#     Friday, August 27th, 2021
 #
 # ----------------------------------------------------------------------
 
@@ -514,9 +514,9 @@ function galyleo_launch() {
       fi
     elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
       if [[ -n "${constraint}" ]]; then
-        slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${ntasks_per_node}:${constraint}"
+        slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${cpus_per_task}:${constraint}"
       else
-        slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${ntasks_per_node}"
+        slog append -f "${job_name}.sh" -m "#PBS -l nodes=${nodes}:ppn=${cpus_per_task}"
       fi
     fi
 

@@ -1,8 +1,19 @@
-## galyleo
+# galyleo
 
 Launch [Jupyter](https://jupyter.org) notebooks in a simple, secure way.
 
-### Description
+- [Description](#description)
+- [Quick Start Guide](#quickstart)
+- [Defining your software environment](#softwareenv)
+  - [Environment modules](#envmodules)
+  - [Singularity containers](#singularity)
+  - [Conda environments](#conda)
+- [Debugging your session](#debug)
+- [Additional Information](#additionalinfo)
+
+<div id='description'/>
+
+## Description
 
 `galyleo` is a shell utility to help you launch Jupyter notebooks on 
 high-performance computing (HPC) systems in a simple, secure way. It 
@@ -19,7 +30,9 @@ against network eavesdropping, tampering, and man-in-the-middles attacks
 by malicious actors looking for potentially vulnerable web services --- 
 like Jupyter --- running on the public internet.
 
-### Quick Start Guide
+<div id='quickstart'/>
+
+## Quick Start Guide
 
 `galyleo` and the Satellite reverse proxy service are currently deployed
 and available for use on the following HPC systems at SDSC:
@@ -127,7 +140,9 @@ Other options:
 - `-Q, --quiet`: suppresses all standard output except for the HTTPS URL 
   or error messages that are thrown
 
-### Defining your software environment
+<div id='softwareenv'/>
+
+## Defining your software environment
 
 After you specify the compute resources required for your Jupyter 
 notebook session using the *Scheduler options* outlined above, the 
@@ -141,18 +156,21 @@ assumes that `jupyter` has been pre-installed within that software
 environment**. If  `jupyter` has not been installed, then the `galyleo 
 launch` command will fail and throw a runtime error.
 
-#### Environment modules
+<div id='envmodules'/>
+
+### Environment modules
 
 Most modern HPC systems use a software module system like 
 [Lmod](https://lmod.readthedocs.io) or 
 [Environment Modules](http://modules.sourceforge.net) to provide you
 with a convenient way to dynamically load pre-installed software 
-packages into your shell environment. If you need to `module load` any 
-software packages into the environment for your Jupyter notebook
-session, you can do so by including them as a comma-separated list
-to the `--env-modules` option in your `galyleo launch` command. Each 
-software module included in the list will be load prior to starting your
-`jupyter` notebook server. 
+packages into your shell environment. 
+
+If you need to `module load` any software packages into the environment
+for your Jupyter notebook session, you can do so by including them as a
+comma-separated list to the `--env-modules` option in your `galyleo 
+launch` command. Each software module included in the list will be load
+prior to starting your `jupyter` notebook server. 
 
 In some cases, the `--env-modules` command-line option may be the only 
 one you need to define your software environment. For example, on 
@@ -173,7 +191,9 @@ galyleo launch --account abc123 --cpus 4 --time-limit 00:30:00 --jupyter noteboo
 However, it is important to note here that only the older Jupyter 
 *notebook* interface is available.
 
-#### Singularity containers
+<div id='singularity'/>
+
+### Singularity containers
 
 [Singularity](https://sylabs.io/guides/latest/user-guide) containers
 bring [operating system-level virtualization](
@@ -182,6 +202,7 @@ to scientific and high-performance computing, allowing you package up
 complete, self-contained software environments --- including operating 
 systems, software applications, libraries, and data --- in a simple, 
 portable, and reproducible way, which can then be run almost anywhere.
+
 If you have a Singularity container that you would like to run for your
 Jupyter notebook session, you can provide a path to the container by 
 including the `--sif` option in your `galyleo launch` command. This 
@@ -298,7 +319,9 @@ Whatever you do, whenever you're launching your Jupyter notebook session
 from a Singularity container on compute resources with NVIDIA GPUs, 
 **please don't forget the `--nv` flag!**
 
-#### Conda environments
+<div id='conda'/>
+
+### Conda environments
 
 [Conda](https://docs.conda.io) is an open-source, user space software 
 package and environment manager developer by [Anaconda Inc.](
@@ -384,7 +407,7 @@ If the system you are working on has fast, node-local storage available
 like [Expanse's local NVMe `/scratch` disk](
 https://www.sdsc.edu/support/user_guides/expanse.html#storage) 
 or 
-[TSCC's local scratch TMPDIR](
+[TSCC's local scratch `$TMPDIR`](
 https://www.sdsc.edu/support/user_guides/tscc.html#running), then you 
 can simply copy these packaged conda environments to the local filesystem, 
 unpack them, and use them as normal without any of the performance 
@@ -459,7 +482,9 @@ as well as the path of the node-local `--scratch-dir`, where the conda
 environment will be unpacked prior to starting your `jupyter` notebook
 server.
 
-### Debugging your session
+<div id='debug'/>
+
+## Debugging your session
 
 If you experience a problem launching your Jupyter notebook session with 
 the `galyleo launch` command, you may be able to debug the issue by 
@@ -468,9 +493,11 @@ the standard output/error file generated by the job itself. You can find
 these files stored in the hidden `~/.galyleo` directory that `galyleo` 
 created in your `$HOME` directory.
 
-### Additional Information
+<div id='additionalinfo'/>
 
-#### Expanse User Portal
+## Additional Information
+
+### Expanse User Portal
 
 `galyleo` has also been integrated with the Open On-Demand-based 
 [Expanse User Portal](https://portal.expanse.sdsc.edu) to further help
@@ -479,7 +506,7 @@ portal, you can access this web-based interface to `galyleo` from the
 `Interactive Apps` tab in the toolbar across the top of your browser,
 then select *Jupyter*. 
 
-#### naked-singularity containers
+### naked-singularity containers
 
 SDSC builds and maintains a number of [custom Singularity containers for
 use on its HPC systems](https://github.com/mkandes/naked-singularity). 
@@ -499,17 +526,17 @@ On Expanse:
 On TSCC:
 - `/projects/builder-group/singularity`
 
-### Status
+## Status
 
 A work in progress.
 
-### Contribute
+## Contribute
 
 If you would like to contribute to the project, then please submit a 
 pull request via GitHub. If you have a feature request or a problem to 
 report, then please create a GitHub issue.
 
-### Author
+## Author
 
 Marty Kandes, Ph.D.  
 Computational & Data Science Research Specialist  
@@ -517,10 +544,10 @@ High-Performance Computing User Services Group
 San Diego Supercomputer Center  
 University of California, San Diego  
 
-### Version
+## Version
 
-0.5.0
+0.5.1
 
-### Last Updated
+## Last Updated
 
 Sunday, August 29th, 2021
