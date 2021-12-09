@@ -390,22 +390,36 @@ environment on login.
 conda config --set auto_activate_base false
 ```
 
-One way to avoid these performance issues when working with conda on an
-HPC systems is to use [conda-pack](https://conda.github.io/conda-pack). 
+If you have not yet installed your conda environment on a shared 
+filesystem (such as in your `$HOME` directory), `galyleo` now also 
+allows you to dynamically create the environment at runtime from an 
+`environment.yml` file before your Jupyter session starts, but only if 
+the system you are working on has fast, node-local storage available, 
+like 
+[Expanse's local NVMe `/scratch` disk](
+https://www.sdsc.edu/support/user_guides/expanse.html#storage)
+or
+[TSCC's local scratch `$TMPDIR`](
+https://www.sdsc.edu/support/user_guides/tscc.html#running). To use 
+this feature, you simply need to provide the absolute path to the 
+`environment.yml` file with the `--conda-yml` command-line option. For 
+example, if you wanted to start an Juoyter notebook session with the 
+`notebooks-sharing` environment, you would use the following command:
+```bash
+galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml "${HOME}/path/to/environment.yml"
+```
+   
+Another way to avoid the metadata performance issues when working with 
+conda on an HPC systems is to use 
+[conda-pack](https://conda.github.io/conda-pack). 
 This command-line tool allows you to create self-contained, relocatable
 conda environments packaged as [tarballs](
-https://en.wikipedia.org/wiki/Tar_(computing)). 
-If the system you are working on has fast, node-local storage available,
-like [Expanse's local NVMe `/scratch` disk](
-https://www.sdsc.edu/support/user_guides/expanse.html#storage) 
-or 
-[TSCC's local scratch `$TMPDIR`](
-https://www.sdsc.edu/support/user_guides/tscc.html#running), then you 
-can simply copy these `conda-pack`aged environments to the local 
-filesystem, unpack them, and activate them without any of the 
-performance issues associated with using conda on a network filesystem.
+https://en.wikipedia.org/wiki/Tar_(computing)). These `conda-pack`aged 
+environments can then be copied to the node-local scratch storage, 
+unpacked there, and then activated without any of the performance 
+issues associated with using conda on a shared network filesystem.
 
-`galyleo` also supports the use of these `conda-pack`aged environments. 
+`galyleo` supports the use of these `conda-pack`aged environments. 
 To demonstrate this capability, let's create a packaged version of the 
 `notebooks-sharing` environment from above on Expanse. First, create an
 interactive session on one of Expanse's `debug` nodes.
@@ -413,7 +427,7 @@ interactive session on one of Expanse's `debug` nodes.
 srun --account=abc123 --partition=debug --nodes=1 --ntasks-per-node=2 --cpus-per-task=1 --mem=4G --time=00:30:00 --pty --wait=0 /bin/bash
 ```
 Once the interactive session has been allocated compute resources,
-download the latest miniconda installer to your `HOME` directory
+download the latest miniconda installer to your `$HOME` directory
 ```bash
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 ```
@@ -461,18 +475,15 @@ pack it,
 ```bash
 conda pack -n notebooks-sharing -o notebooks-sharing.tar.gz
 ```
-and copy the generated tarball back to your `HOME` directory. You can 
+and copy the generated tarball back to your `$HOME` directory. You can 
 now close your interactive session.
 
 To `launch` your Jupyter notebook session with a `conda-pack`aged 
-environment, you must provide a path to the tarball via the 
-`--conda-pack` command-line option
+environment, you must provide a absolute path to the tarball via 
+the `--conda-pack` command-line option.
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-pack notebooks-sharing.tar.gz --scratch-dir '"/scratch/${USER}/job_${SLURM_JOB_ID}"'
+galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-pack "${HOME}/path/to/notebooks-sharing.tar.gz"
 ```
-as well as the path of the node-local `--scratch-dir`, where the conda
-environment will be unpacked prior to starting your `jupyter` notebook
-server.
 
 <div id='debug'/>
 
@@ -536,8 +547,8 @@ University of California, San Diego
 
 ## Version
 
-0.5.3
+0.5.4
 
 ## Last Updated
 
-Wednesday, September 1st, 2021
+Thursday, December 9th, 2021
