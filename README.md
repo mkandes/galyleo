@@ -131,6 +131,7 @@ Software environment options:
 - `--conda-init`: path to the conda.sh initialization script of a
   conda distribution
 - `--conda-pack`: path to the tarball of a `conda-pack`aged environment
+- `--conda-yml`: path to an `environment.yml` file
 - `--scratch-dir`: path to a node-local scratch directory
 
 Other options:
@@ -547,7 +548,7 @@ University of California, San Diego
 
 ## Version
 
-0.5.5
+0.5.6
 
 ## Last Updated
 
