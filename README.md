@@ -132,6 +132,8 @@ Software environment options:
   conda distribution
 - `--conda-pack`: path to the tarball of a `conda-pack`aged environment
 - `--conda-yml`: path to an `environment.yml` file
+- `--mamba`: use mamba instead of miniconda to create your conda
+  environment from an `environment.yml` file.
 - `--scratch-dir`: path to a node-local scratch directory
 
 Other options:
@@ -548,8 +550,8 @@ University of California, San Diego
 
 ## Version
 
-0.5.6
+0.5.7
 
 ## Last Updated
 
-Thursday, December 9th, 2021
+Monday, May 23rd, 2022

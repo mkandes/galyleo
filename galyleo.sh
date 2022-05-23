@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Thursday, December 9th, 2021
+#     Monday, May 23rd, 2022
 #
 # ----------------------------------------------------------------------
 
@@ -110,6 +110,7 @@ fi
 #      | --conda-pack <conda_pack>
 #      | --conda-env <conda_env>
 #      | --conda-yml <conda_yml>
+#      | --mamba
 #   -Q | --quiet
 #
 # Returns:
@@ -157,6 +158,7 @@ function galyleo_launch() {
   local conda_pack=''
   local conda_env=''
   local conda_yml=''
+  local conda_mamba='false'
 
   # Declare internal galyelo_launch variables not affected by input variables.
   local job_name="galyleo-${CURRENT_LOCAL_TIME}-${CURRENT_UNIX_TIME}-${RANDOM_ID}"
@@ -268,6 +270,10 @@ function galyleo_launch() {
         conda_yml="${2}"
         shift 2
         ;;
+      --mamba )
+        conda_mamba='true'
+        shift 1
+        ;;
       -Q | --quiet )
         SLOG_LEVEL=0
         shift 1
@@ -279,36 +285,32 @@ function galyleo_launch() {
   done
 
   # Print all command-line options read in for launch to standard output.
-  slog output -m ''
   slog output -m 'Preparing galyleo for launch into Jupyter orbit ...'
-  slog output -m ''
-  slog output -m '  Listing all launch parameters ...'
-  slog output -m ''
-  slog output -m '    command-line options  : values'
-  slog output -m ''
-  slog output -m "      -A | --account      : ${account}"
-  slog output -m "      -R | --reservation  : ${reservation}"
-  slog output -m "      -p | --partition    : ${partition}"
-  slog output -m "      -q | --qos          : ${qos}"
-  slog output -m "      -c | --cpus         : ${cpus_per_task}"
-  slog output -m "      -m | --memory       : ${memory_per_node} GB"
-  slog output -m "      -g | --gpus         : ${gpus}"
-  slog output -m "         | --gres         : ${gres}"
-  slog output -m "      -t | --time-limit   : ${time_limit}"
-  slog output -m "      -C | --constraint   : ${constraint}"
-  slog output -m "      -j | --jupyter      : ${jupyter_interface}"
-  slog output -m "      -d | --notebook-dir : ${jupyter_notebook_dir}"
-  slog output -m "         | --scratch-dir  : ${local_scratch_dir}"
-  slog output -m "      -e | --env-modules  : ${env_modules}"
-  slog output -m "      -s | --sif          : ${singularity_image_file}"
-  slog output -m "      -B | --bind         : ${singularity_bind_mounts}"
-  slog output -m "         | --nv           : ${singularity_gpu_type}"
-  slog output -m "         | --conda-init   : ${conda_init}"
-  slog output -m "         | --conda-pack   : ${conda_pack}"
-  slog output -m "         | --conda-env    : ${conda_env}"
-  slog output -m "         | --conda-yml    : ${conda_yml}"
-  slog output -m "      -Q | --quiet        : ${SLOG_LEVEL}"
-  slog output -m ''
+  slog output -m 'Listing all launch parameters ...'
+  slog output -m '  command-line options  : values'
+  slog output -m "    -A | --account      : ${account}"
+  slog output -m "    -R | --reservation  : ${reservation}"
+  slog output -m "    -p | --partition    : ${partition}"
+  slog output -m "    -q | --qos          : ${qos}"
+  slog output -m "    -c | --cpus         : ${cpus_per_task}"
+  slog output -m "    -m | --memory       : ${memory_per_node} GB"
+  slog output -m "    -g | --gpus         : ${gpus}"
+  slog output -m "       | --gres         : ${gres}"
+  slog output -m "    -t | --time-limit   : ${time_limit}"
+  slog output -m "    -C | --constraint   : ${constraint}"
+  slog output -m "    -j | --jupyter      : ${jupyter_interface}"
+  slog output -m "    -d | --notebook-dir : ${jupyter_notebook_dir}"
+  slog output -m "       | --scratch-dir  : ${local_scratch_dir}"
+  slog output -m "    -e | --env-modules  : ${env_modules}"
+  slog output -m "    -s | --sif          : ${singularity_image_file}"
+  slog output -m "    -B | --bind         : ${singularity_bind_mounts}"
+  slog output -m "       | --nv           : ${singularity_gpu_type}"
+  slog output -m "       | --conda-init   : ${conda_init}"
+  slog output -m "       | --conda-pack   : ${conda_pack}"
+  slog output -m "       | --conda-env    : ${conda_env}"
+  slog output -m "       | --conda-yml    : ${conda_yml}"
+  slog output -m "       | --mamba        : ${conda_mamba}"
+  slog output -m "    -Q | --quiet        : ${SLOG_LEVEL}"
 
   # Check if the user specified a Jupyter user interface. If the user
   # did not specify a user interface, then set JupyterLab ('lab') as the
@@ -473,7 +475,6 @@ function galyleo_launch() {
   cd "${GALYLEO_CACHE_DIR}"
 
   # Generate a Jupyter launch script.
-  slog output -m ''
   slog output -m 'Generating Jupyter launch script ...'
   if [[ ! -f "${job_name}.sh" ]]; then
 
@@ -619,7 +620,12 @@ function galyleo_launch() {
         slog append -f "${job_name}.sh" -m './Miniconda3-latest-Linux-x86_64.sh -b -p "${CONDA_INSTALL_PATH}"'
         slog append -f "${job_name}.sh" -m 'source "${CONDA_INSTALL_PATH}/etc/profile.d/conda.sh"'
         slog append -f "${job_name}.sh" -m 'conda activate base'
-        slog append -f "${job_name}.sh" -m "conda env create --file ${conda_yml}"
+        if [[ "${conda_mamba}" == 'true' ]]; then
+          slog append -f "${job_name}.sh" -m 'conda install mamba -n base -c conda-forge'
+          slog append -f "${job_name}.sh" -m "mamba env create --file ${conda_yml}"
+        else
+          slog append -f "${job_name}.sh" -m "conda env create --file ${conda_yml}"
+        fi
         slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
       fi
     fi
@@ -739,6 +745,7 @@ function galyleo_launch() {
 #   -D | --dns-domain <dns_domain>
 #   -p | --partition <partition>
 #   -j | --jupyter <jupyter_interface>
+#      | --scratch-dir <local_scratch_dir>
 #
 # Returns:
 #
@@ -877,11 +884,8 @@ function galyleo_clean() {
 # ----------------------------------------------------------------------
 function galyleo_help() {
 
-  slog output -m ''
   slog output -m 'USAGE: galyleo launch [command-line option] {value}'
-  slog output -m ''
   slog output -m '  command-line options  : (default) values'
-  slog output -m ''
   slog output -m "    -A | --account      : ${account}"
   slog output -m "    -R | --reservation  : ${reservation}"
   slog output -m "    -p | --partition    : ${partition}"
@@ -902,6 +906,8 @@ function galyleo_help() {
   slog output -m "       | --conda-init   : ${conda_init}"
   slog output -m "       | --conda-pack   : ${conda_pack}"
   slog output -m "       | --conda-env    : ${conda_env}"
+  slog output -m "       | --conda-yml    : ${conda_yml}"
+  slog output -m "       | --mamba        : ${conda_mamba}"
   slog output -m "    -Q | --quiet        : ${SLOG_LEVEL}"
   slog output -m ''
 
