@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Monday, May 23rd, 2022
+#     Wednesday, November 23rd, 2022
 #
 # ----------------------------------------------------------------------
 
@@ -131,11 +131,11 @@ function galyleo_launch() {
   local qos=''
   local -i nodes=1
   local -i ntasks_per_node=1
-  local -i cpus_per_task=1
-  local -i memory_per_node=-1
+  local -i cpus_per_task="${GALYLEO_DEFAULT_CPUS}"
+  local -i memory_per_node="${GALYLEO_DEFAULT_MEMORY}"
   local gpus=''
   local gres=''
-  local time_limit='00:30:00'
+  local time_limit="${GALYLEO_DEFAULT_TIME_LIMIT}"
   local constraint=''
 
   # Declare input variables associated with Jupyter runtime environment.
@@ -146,7 +146,7 @@ function galyleo_launch() {
   local local_scratch_dir="${GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR}"
 
   # Declare input variables associated with environment modules.
-  local env_modules=''
+  local env_modules="${GALYLEO_DEFAULT_ENV_MODULES}"
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
@@ -743,9 +743,14 @@ function galyleo_launch() {
 #
 #   -r | --reverse-proxy <reverse_proxy_fqdn>
 #   -D | --dns-domain <dns_domain>
+#   -s | --scheduler <scheduler>
 #   -p | --partition <partition>
+#   -c | --cpus <cpus_per_task>
+#   -m | --memory <memory_per_node> (in units of GB)
+#   -t | --time-limit <time_limit>
 #   -j | --jupyter <jupyter_interface>
 #      | --scratch-dir <local_scratch_dir>
+#   -e | --env-modules <env_modules>
 #
 # Returns:
 #
@@ -762,12 +767,18 @@ function galyleo_configure() {
   # Declare default variables associated with scheduler.
   local scheduler='slurm'
   local partition='shared'
+  local -i cpus_per_task=1
+  local -i memory_per_node=1
+  local time_limit='00:30:00'
 
   # Declare default variables associated with Jupyter runtime environment.
   local jupyter_interface='lab'
 
   # Declare input variables associated with system architecture.
   local local_scratch_dir='/tmp'
+
+  # Declare input variables associated with environment modules.
+  local env_modules=''
 
   # Read in command-line options and assign input variables to local
   # variables.
@@ -789,12 +800,27 @@ function galyleo_configure() {
         partition="${2}"
         shift 2
         ;;
+      -c | --cpus )
+        cpus_per_task="${2}"
+        shift 2
+        ;;
+      -m | --memory )
+        memory_per_node="${2}"
+        ;;
+      -t | --time-limit )
+        time_limit="${2}"
+        shift 2
+        ;;
       -j | --jupyter )
         jupyter_interface="${2}"
         shift 2
         ;;
       --scratch-dir )
         local_scratch_dir="${2}"
+        shift 2
+        ;;
+      -e | --env-modules )
+        env_modules="${2}"
         shift 2
         ;;
       *)
@@ -823,12 +849,16 @@ function galyleo_configure() {
      slog output -m 'Creating galyleo.conf file ... '
 
      slog append -f 'galyleo.conf' -m '#!/usr/bin/env sh'
-     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_REVERSE_PROXY_FQDN='${reverse_proxy_fqdn}'"
-     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_DNS_DOMAIN='${dns_domain}'"
-     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_SCHEDULER='${scheduler}'"
-     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_DEFAULT_PARTITION='${partition}'"
-     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_DEFAULT_JUPYTER_INTERFACE='${jupyter_interface}'"
-     slog append -f 'galyleo.conf' -m "declare -xr GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR='${local_scratch_dir}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_REVERSE_PROXY_FQDN='${reverse_proxy_fqdn}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DNS_DOMAIN='${dns_domain}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_SCHEDULER='${scheduler}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_PARTITION='${partition}'"
+     slog append -f 'galyleo.conf' -m "declare -xir GALYLEO_DEFAULT_CPUS='${cpus_per_task}'"
+     slog append -f 'galyleo.conf' -m "declare -xir GALYLEO_DEFAULT_MEMORY='${memory_per_node}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_TIME_LIMIT='${time_limit}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_JUPYTER_INTERFACE='${jupyter_interface}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR='${local_scratch_dir}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_ENV_MODULES='${env_modules}'"
 
   fi
 
