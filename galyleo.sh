@@ -110,7 +110,9 @@ fi
 #      | --conda-pack <conda_pack>
 #      | --conda-env <conda_env>
 #      | --conda-yml <conda_yml>
-#      | --mamba
+#      | --mamba <false/true>
+#      | --disable-checklist <false/true>
+#      | --checklist-timeout <checklist_timeout>
 #   -Q | --quiet
 #
 # Returns:
@@ -159,6 +161,10 @@ function galyleo_launch() {
   local conda_env=''
   local conda_yml=''
   local conda_mamba='false'
+
+  # Declare input variables associated with error checking.
+  local disable_checklist='false'
+  local -i checklist_timeout=10
 
   # Declare internal galyelo_launch variables not affected by input variables.
   local job_name="galyleo-${CURRENT_LOCAL_TIME}-${CURRENT_UNIX_TIME}-${RANDOM_ID}"
@@ -274,6 +280,14 @@ function galyleo_launch() {
         conda_mamba='true'
         shift 1
         ;;
+      --disable-checklist )
+        disable_checklist='true'
+        shift 1
+        ;;
+      --checklist-timeout )
+        checklist_timeout="${2}"
+        shift 2
+        ;;
       -Q | --quiet )
         SLOG_LEVEL=0
         shift 1
@@ -287,154 +301,162 @@ function galyleo_launch() {
   # Print all command-line options read in for launch to standard output.
   slog output -m 'Preparing galyleo for launch into Jupyter orbit ...'
   slog output -m 'Listing all launch parameters ...'
-  slog output -m '  command-line options  : values'
-  slog output -m "    -A | --account      : ${account}"
-  slog output -m "    -R | --reservation  : ${reservation}"
-  slog output -m "    -p | --partition    : ${partition}"
-  slog output -m "    -q | --qos          : ${qos}"
-  slog output -m "    -c | --cpus         : ${cpus_per_task}"
-  slog output -m "    -m | --memory       : ${memory_per_node} GB"
-  slog output -m "    -g | --gpus         : ${gpus}"
-  slog output -m "       | --gres         : ${gres}"
-  slog output -m "    -t | --time-limit   : ${time_limit}"
-  slog output -m "    -C | --constraint   : ${constraint}"
-  slog output -m "    -j | --jupyter      : ${jupyter_interface}"
-  slog output -m "    -d | --notebook-dir : ${jupyter_notebook_dir}"
-  slog output -m "       | --scratch-dir  : ${local_scratch_dir}"
-  slog output -m "    -e | --env-modules  : ${env_modules}"
-  slog output -m "    -s | --sif          : ${singularity_image_file}"
-  slog output -m "    -B | --bind         : ${singularity_bind_mounts}"
-  slog output -m "       | --nv           : ${singularity_gpu_type}"
-  slog output -m "       | --conda-init   : ${conda_init}"
-  slog output -m "       | --conda-pack   : ${conda_pack}"
-  slog output -m "       | --conda-env    : ${conda_env}"
-  slog output -m "       | --conda-yml    : ${conda_yml}"
-  slog output -m "       | --mamba        : ${conda_mamba}"
-  slog output -m "    -Q | --quiet        : ${SLOG_LEVEL}"
+  slog output -m '  command-line options       : values'
+  slog output -m "    -A | --account           : ${account}"
+  slog output -m "    -R | --reservation       : ${reservation}"
+  slog output -m "    -p | --partition         : ${partition}"
+  slog output -m "    -q | --qos               : ${qos}"
+  slog output -m "    -c | --cpus              : ${cpus_per_task}"
+  slog output -m "    -m | --memory            : ${memory_per_node} GB"
+  slog output -m "    -g | --gpus              : ${gpus}"
+  slog output -m "       | --gres              : ${gres}"
+  slog output -m "    -t | --time-limit        : ${time_limit}"
+  slog output -m "    -C | --constraint        : ${constraint}"
+  slog output -m "    -j | --jupyter           : ${jupyter_interface}"
+  slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
+  slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
+  slog output -m "    -e | --env-modules       : ${env_modules}"
+  slog output -m "    -s | --sif               : ${singularity_image_file}"
+  slog output -m "    -B | --bind              : ${singularity_bind_mounts}"
+  slog output -m "       | --nv                : ${singularity_gpu_type}"
+  slog output -m "       | --conda-init        : ${conda_init}"
+  slog output -m "       | --conda-pack        : ${conda_pack}"
+  slog output -m "       | --conda-env         : ${conda_env}"
+  slog output -m "       | --conda-yml         : ${conda_yml}"
+  slog output -m "       | --mamba             : ${conda_mamba}"
+  slog output -m "       | --disable-checklist : ${disable_checklist}"
+  slog output -m "       | --checklist-timeout : ${checklist_timeout} s"
+  slog output -m "    -Q | --quiet             : ${SLOG_LEVEL}"
 
-  # Check if the user specified a Jupyter user interface. If the user
-  # did not specify a user interface, then set JupyterLab ('lab') as the
-  # default interface.
-  if [[ -z "${jupyter_interface}" ]]; then
-    jupyter_interface='lab'
-  fi
+  # Start pre-launch checklist.
+  if [[ "${disable_checklist}" == 'false' ]]; then
 
-  # Check if a valid Jupyter user interface was specified. At 
-  # present, the only two valid user interfaces are JupyterLab ('lab')
-  # OR Jupyter Notebook ('notebook'). If an invalid interface name is
-  # provided by the user, then halt the launch.
-  case "${jupyter_interface}" in
-    'lab' )
-      ;;
-    'notebook' )
-      ;;
-    *)
-    slog error -m "Not a valid Jupyter user interface: ${jupyter_interface}"
-    slog error -m "Only --jupyter lab OR --jupyter notebook are allowed."
-    return 1
-  esac
+    # Check if the user specified a Jupyter user interface. If the user
+    # did not specify a user interface, then set JupyterLab ('lab') as the
+    # default interface.
+    if [[ -z "${jupyter_interface}" ]]; then
+      jupyter_interface='lab'
+    fi
 
-  # Check if the user specified a working directory for their Jupyter
-  # notebook session. If the user did not specify a working directory,
-  # then set the working directory to the user's $HOME directory.
-  if [[ -z "${jupyter_notebook_dir}" ]]; then
-    jupyter_notebook_dir="${HOME}"
-  fi
+    # Check if a valid Jupyter user interface was specified. At
+    # present, the only two valid user interfaces are JupyterLab ('lab')
+    # OR Jupyter Notebook ('notebook'). If an invalid interface name is
+    # provided by the user, then halt the launch.
+    case "${jupyter_interface}" in
+      'lab' )
+        ;;
+      'notebook' )
+        ;;
+      *)
+      slog error -m "Not a valid Jupyter user interface: ${jupyter_interface}"
+      slog error -m "Only --jupyter lab OR --jupyter notebook are allowed."
+      return 1
+    esac
 
-  # Check if the Jupyter notebook directory exists. If it does not
-  # exist, then halt the launch.
-  if [[ ! -d "${jupyter_notebook_dir}" ]]; then
-    slog error -m "Jupyter notebook directory does not exist: ${jupyter_notebook_dir}"
-    return 1
-  fi
+    # Check if the user specified a working directory for their Jupyter
+    # notebook session. If the user did not specify a working directory,
+    # then set the working directory to the user's $HOME directory.
+    if [[ -z "${jupyter_notebook_dir}" ]]; then
+      jupyter_notebook_dir="${HOME}"
+    fi
+
+    # Check if the Jupyter notebook directory exists. If it does not
+    # exist, then halt the launch.
+    if [[ ! -d "${jupyter_notebook_dir}" ]]; then
+      slog error -m "Jupyter notebook directory does not exist: ${jupyter_notebook_dir}"
+      return 1
+    fi
  
-  # Check if the user has write permissions within the Jupyter notebook
-  # directory. If the user does not have write permissions, then halt
-  # the launch.
-  if [[ ! -w "${jupyter_notebook_dir}" ]]; then
-    slog error -m "Jupyter notebook directory exists, but you do not have write permissions: ${jupyter_notebook_dir}"
-    return 1
-  fi
+    # Check if the user has write permissions within the Jupyter notebook
+    # directory. If the user does not have write permissions, then halt
+    # the launch.
+    if [[ ! -w "${jupyter_notebook_dir}" ]]; then
+      slog error -m "Jupyter notebook directory exists, but you do not have write permissions: ${jupyter_notebook_dir}"
+      return 1
+    fi
 
-  # Check if all environment modules specified by the user, if any, are
-  # available and can be loaded successfully. If not, then halt the launch.
-  if [[ -n "${env_modules}" ]]; then
-    IFS=','
-    read -r -a modules <<< "${env_modules}"
-    unset IFS
-    for module in "${modules[@]}"; do
-      module load "${module}"
-      if [[ $? -ne 0 ]]; then
-        slog error -m "module not found: ${module}"
+    # Check if all environment modules specified by the user, if any, are
+    # available and can be loaded successfully. If not, then halt the launch.
+    if [[ -n "${env_modules}" ]]; then
+      IFS=','
+      read -r -a modules <<< "${env_modules}"
+      unset IFS
+      for module in "${modules[@]}"; do
+        module load "${module}"
+        if [[ $? -ne 0 ]]; then
+          slog error -m "module not found: ${module}"
+          return 1
+        fi
+      done
+    fi
+
+    # Check if the conda environment specified by the user, if any, can be
+    # initialized and activated successfully. If not, then halt the launch.
+    if [[ -n "${conda_env}" ]]; then
+      if [[ -z "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
+        if [[ -n "${conda_init}" ]]; then
+          source "${conda_init}"
+        else
+          source ~/.bashrc
+        fi
+        conda activate "${conda_env}"
+        if [[ "${?}" -ne 0 ]]; then
+          slog error -m "conda environment could not be activated: ${conda_env}"
+          return 1
+        fi
+      elif [[ -n "${conda_pack}" ]]; then
+        if [[ ! -f "${conda_pack}" ]]; then
+          slog error -m "conda environment package file not found: ${conda_pack}"
+          return 1
+        fi
+      elif [[ -n "${conda_yml}" ]]; then
+        if [[ ! -f "${conda_yml}" ]]; then
+          slog error -m "conda environment yaml file not found: ${conda_yml}"
+          return 1
+        fi
+      fi
+    fi
+
+    # Check if the Singularity container image file specified by the user,
+    # if any, exists. If it does not exist, then halt the launch.
+    if [[ -n "${singularity_image_file}" ]]; then
+      if [[ ! -f "${singularity_image_file}" ]]; then
+        slog error -m "Singularity image file does not exist: ${singularity_image_file}"
         return 1
       fi
-    done
-  fi
+    fi
 
-  # Check if the conda environment specified by the user, if any, can be
-  # initialized and activated successfully. If not, then halt the launch.
-  if [[ -n "${conda_env}" ]]; then
-    if [[ -z "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
-      if [[ -n "${conda_init}" ]]; then
-        source "${conda_init}"
+    # Check if Jupyter is available within the software environment
+    # defined by the user. If a Singularity container is required, then
+    # also check if the singularity executable is available within the
+    # environment defined by the user prior to checking for Jupyter.
+    # Otherwise, halt the launch.
+    if [[ -n "${singularity_image_file}" ]]; then
+      singularity --version > /dev/null
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m "No singularity executable was found within the software environment."
+        return 1
       else
-        source ~/.bashrc
+        timeout "${checklist_timeout}" singularity exec "${singularity_image_file}" jupyter "${jupyter_interface}" --version > /dev/null
+        if [[ "${?}" -ne 0 ]]; then
+          slog error -m "Either no jupyter executable was found within the singularity container OR the process used to check for the jupyter executable within the container may have hung and then timed out."
+          return 1
+        fi
       fi
-      conda activate "${conda_env}"
-      if [[ "${?}" -ne 0 ]]; then
-        slog error -m "conda environment could not be activated: ${conda_env}"
-        return 1
-      fi
-    elif [[ -n "${conda_pack}" ]]; then 
-      if [[ ! -f "${conda_pack}" ]]; then
-        slog error -m "conda environment package file not found: ${conda_pack}"
-        return 1
-      fi
-    elif [[ -n "${conda_yml}" ]]; then
-      if [[ ! -f "${conda_yml}" ]]; then
-        slog error -m "conda environment yaml file not found: ${conda_yml}"
-        return 1 
-      fi 
-    fi
-  fi
-
-  # Check if the Singularity container image file specified by the user,
-  # if any, exists. If it does not exist, then halt the launch.
-  if [[ -n "${singularity_image_file}" ]]; then
-    if [[ ! -f "${singularity_image_file}" ]]; then
-      slog error -m "Singularity image file does not exist: ${singularity_image_file}"
-      return 1
-    fi
-  fi
-
-  # Check if Jupyter is available within the software environment 
-  # defined by the user. If a Singularity container is required, then
-  # also check if the singularity executable is available within the
-  # environment defined by the user prior to checking for Jupyter.
-  # Otherwise, halt the launch.
-  if [[ -n "${singularity_image_file}" ]]; then
-    singularity --version > /dev/null
-    if [[ "${?}" -ne 0 ]]; then
-      slog error -m "No singularity executable was found within the software environment."
-      return 1
     else
-      timeout 10 singularity exec "${singularity_image_file}" jupyter "${jupyter_interface}" --version > /dev/null
-      if [[ "${?}" -ne 0 ]]; then
-        slog error -m "Either no jupyter executable was found within the singularity container OR the process used to check for the jupyter executable within the container may have hung and then timed out."
-        return 1
-      fi
-    fi
-  else
-    if [[ -z "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
-      jupyter "${jupyter_interface}" --version > /dev/null
-      if [[ "${?}" -ne 0 ]]; then
+      if [[ -z "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
+        jupyter "${jupyter_interface}" --version > /dev/null
+        if [[ "${?}" -ne 0 ]]; then
           slog error -m "No jupyter executable was found within the software environment."
           return 1
+        fi
+      else
+        slog warning -m "Using a packaged conda environment; cannot check if Jupyter is available prior to launch."
       fi
-    else
-      slog warning -m "Using a packaged conda environment; cannot check if Jupyter is available prior to launch."
     fi
+
   fi
+  # End pre-launch checklist.
 
   # Request a subdomain connection token from reverse proxy service. If the 
   # reverse proxy service returns an HTTP/S error, then halt the launch.
