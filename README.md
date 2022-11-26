@@ -130,10 +130,12 @@ Software environment options:
   software environment for the Jupyter notebook session**
 - `--conda-init`: path to the conda.sh initialization script of a
   conda distribution
-- `--conda-pack`: path to the tarball of a `conda-pack`aged environment
 - `--conda-yml`: path to an `environment.yml` file
 - `--mamba`: use mamba instead of miniconda to create your conda
   environment from an `environment.yml` file.
+- `--cache`: cache your conda environment created from an 
+  `environment.yml` file using conda-pack; a cached environment will be
+  unpacked and reused if the `environment.yml` file does not change
 - `--scratch-dir`: path to a node-local scratch directory
 
 Other options:
@@ -350,7 +352,6 @@ channels:
   - anaconda
 
 dependencies:
-  - conda-pack=0.6.0
   - python=3.7
   - jupyterlab=3
   - pandas=1.2.4
@@ -412,82 +413,6 @@ example, if you wanted to start an Juoyter notebook session with the
 galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml "${HOME}/path/to/environment.yml"
 ```
    
-Another way to avoid the metadata performance issues when working with 
-conda on an HPC systems is to use 
-[conda-pack](https://conda.github.io/conda-pack). 
-This command-line tool allows you to create self-contained, relocatable
-conda environments packaged as [tarballs](
-https://en.wikipedia.org/wiki/Tar_(computing)). These `conda-pack`aged 
-environments can then be copied to the node-local scratch storage, 
-unpacked there, and then activated without any of the performance 
-issues associated with using conda on a shared network filesystem.
-
-`galyleo` supports the use of these `conda-pack`aged environments. 
-To demonstrate this capability, let's create a packaged version of the 
-`notebooks-sharing` environment from above on Expanse. First, create an
-interactive session on one of Expanse's `debug` nodes.
-```bash
-srun --account=abc123 --partition=debug --nodes=1 --ntasks-per-node=2 --cpus-per-task=1 --mem=4G --time=00:30:00 --pty --wait=0 /bin/bash
-```
-Once the interactive session has been allocated compute resources,
-download the latest miniconda installer to your `$HOME` directory
-```bash
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-```
-and change its permissions such that it is executable.
-```bash
-chmod +x Miniconda3-latest-Linux-x86_64.sh
-```
-Next, set the following environment variables to use the node-local 
-scratch directory
-```bash
-export CONDA_INSTALL_PATH="/scratch/${USER}/job_${SLURM_JOB_ID}/miniconda3"
-```
-```bash
-export CONDA_ENVS_PATH="${CONDA_INSTALL_PATH}/envs"
-```
-```bash
-export CONDA_PKGS_DIRS="${CONDA_INSTALL_PATH}/pkgs"
-```
-and then run the conda installer in batch mode, redirecting its 
-installation prefix to the node-local scratch directory using these 
-environment variables.
-```bash
-./Miniconda3-latest-Linux-x86_64.sh -b -p "${CONDA_INSTALL_PATH}"
-```
-When the installation is complete, you can then initialize the 
-distribution
-```bash
-source "${CONDA_INSTALL_PATH}/etc/profile.d/conda.sh"
-```
-and activate its `base` conda environment.
-```bash
-conda activate base
-```
-You can now create the `notebooks-sharing` environment from
-the `environment.yml` file,
-```bash
-conda env create --file environment.yml
-```
-which includes `conda-pack`. Once the environment has been created, 
-you simply need to activate it,
-```bash
-conda activate notebooks-sharing
-```
-pack it,
-```bash
-conda pack -n notebooks-sharing -o notebooks-sharing.tar.gz
-```
-and copy the generated tarball back to your `$HOME` directory. You can 
-now close your interactive session.
-
-To `launch` your Jupyter notebook session with a `conda-pack`aged 
-environment, you must provide a absolute path to the tarball via 
-the `--conda-pack` command-line option.
-```bash
-galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-pack "${HOME}/path/to/notebooks-sharing.tar.gz"
-```
-
 <div id='debug'/>
 
 ## Debugging your session
@@ -550,8 +475,8 @@ University of California, San Diego
 
 ## Version
 
-0.5.9
+0.6.0
 
 ## Last Updated
 
-Wednesday, November 23rd, 2022
+Saturday, November 26th, 2022

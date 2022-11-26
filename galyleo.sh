@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Wednesday, November 23rd, 2022
+#     Saturday, November 26th, 2022
 #
 # ----------------------------------------------------------------------
 
@@ -107,7 +107,6 @@ fi
 #   -B | --bind <singularity_bind_mounts>
 #      | --nv
 #      | --conda-init <conda_init>
-#      | --conda-pack <conda_pack>
 #      | --conda-env <conda_env>
 #      | --conda-yml <conda_yml>
 #      | --mamba <false/true>
@@ -145,6 +144,7 @@ function galyleo_launch() {
   local jupyter_notebook_dir=''
 
   # Declare input variables associated with system architecture.
+  local galyleo_launch_dir="${PWD}"
   local local_scratch_dir="${GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR}"
 
   # Declare input variables associated with environment modules.
@@ -157,10 +157,10 @@ function galyleo_launch() {
 
   # Declare input variables associated with conda environments.
   local conda_init=''
-  local conda_pack=''
   local conda_env=''
   local conda_yml=''
   local conda_mamba='false'
+  local conda_cache='false'
 
   # Declare input variables associated with error checking.
   local disable_checklist='false'
@@ -264,10 +264,6 @@ function galyleo_launch() {
         conda_init="${2}"
         shift 2
         ;;
-      --conda-pack )
-        conda_pack="${2}"
-        shift 2
-        ;;
       --conda-env )
         conda_env="${2}"
         shift 2
@@ -278,6 +274,10 @@ function galyleo_launch() {
         ;;
       --mamba )
         conda_mamba='true'
+        shift 1
+        ;;
+      --cache )
+        conda_cache='true'
         shift 1
         ;;
       --disable-checklist )
@@ -320,10 +320,10 @@ function galyleo_launch() {
   slog output -m "    -B | --bind              : ${singularity_bind_mounts}"
   slog output -m "       | --nv                : ${singularity_gpu_type}"
   slog output -m "       | --conda-init        : ${conda_init}"
-  slog output -m "       | --conda-pack        : ${conda_pack}"
   slog output -m "       | --conda-env         : ${conda_env}"
   slog output -m "       | --conda-yml         : ${conda_yml}"
   slog output -m "       | --mamba             : ${conda_mamba}"
+  slog output -m "       | --cache             : ${conda_cache}"
   slog output -m "       | --disable-checklist : ${disable_checklist}"
   slog output -m "       | --checklist-timeout : ${checklist_timeout} s"
   slog output -m "    -Q | --quiet             : ${SLOG_LEVEL}"
@@ -392,28 +392,21 @@ function galyleo_launch() {
 
     # Check if the conda environment specified by the user, if any, can be
     # initialized and activated successfully. If not, then halt the launch.
-    if [[ -n "${conda_env}" ]]; then
-      if [[ -z "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
-        if [[ -n "${conda_init}" ]]; then
-          source "${conda_init}"
-        else
-          source ~/.bashrc
-        fi
-        conda activate "${conda_env}"
-        if [[ "${?}" -ne 0 ]]; then
-          slog error -m "conda environment could not be activated: ${conda_env}"
-          return 1
-        fi
-      elif [[ -n "${conda_pack}" ]]; then
-        if [[ ! -f "${conda_pack}" ]]; then
-          slog error -m "conda environment package file not found: ${conda_pack}"
-          return 1
-        fi
-      elif [[ -n "${conda_yml}" ]]; then
-        if [[ ! -f "${conda_yml}" ]]; then
-          slog error -m "conda environment yaml file not found: ${conda_yml}"
-          return 1
-        fi
+    if [[ -n "${conda_env}" ]] && [[ -z "${conda_yml}" ]]; then
+      if [[ -n "${conda_init}" ]]; then
+        source "${conda_init}"
+      else
+        source ~/.bashrc
+      fi
+      conda activate "${conda_env}"
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m "conda environment could not be activated: ${conda_env}"
+        return 1
+      fi
+    elif [[ -n "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
+      if [[ ! -f "${conda_yml}" ]]; then
+        slog error -m "conda environment yaml file not found: ${conda_yml}"
+        return 1
       fi
     fi
 
@@ -444,7 +437,7 @@ function galyleo_launch() {
         fi
       fi
     else
-      if [[ -z "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
+      if [[ -z "${conda_yml}" ]]; then
         jupyter "${jupyter_interface}" --version > /dev/null
         if [[ "${?}" -ne 0 ]]; then
           slog error -m "No jupyter executable was found within the software environment."
@@ -597,6 +590,12 @@ function galyleo_launch() {
 
     slog append -f "${job_name}.sh" -m ''
 
+    if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
+      slog append -f "${job_name}.sh" -m 'declare -xr GALYLEO_LAUNCH_DIR="${SLURM_SUBMIT_DIR}"'
+    elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
+      slog append -f "${job_name}.sh" -m 'declare -xr GALYLEO_LAUNCH_DIR=${PBS_O_WORKDIR}"'
+    fi
+
     slog append -f "${job_name}.sh" -m "declare -xr LOCAL_SCRATCH_DIR=${local_scratch_dir}"
     slog append -f "${job_name}.sh" -m ''
 
@@ -617,23 +616,36 @@ function galyleo_launch() {
       done
     fi
 
-    # Activate a conda environment specified by the user.
-    if [[ -n "${conda_env}" ]]; then
-      if [[ -z "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
-        if [[ -n "${conda_init}" ]]; then
-          slog append -f "${job_name}.sh" -m "source ${conda_init}"
-        else
-          slog append -f "${job_name}.sh" -m 'source ~/.bashrc'
-        fi
-        slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
-      elif [[ -n "${conda_pack}" ]] && [[ -z "${conda_yml}" ]]; then
+    # Activate a pre-installed conda environment specified by the user.
+    if [[ -n "${conda_env}" ]] && [[ -z "${conda_yml}" ]]; then
+      if [[ -n "${conda_init}" ]]; then
+        slog append -f "${job_name}.sh" -m "source ${conda_init}"
+      else
+        slog append -f "${job_name}.sh" -m 'source ~/.bashrc'
+      fi
+      slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
+    fi
+
+    # Create and/or activate a dynamically generated conda environment specified by the user.
+    if [[ -n "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
+      if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
+        mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
+      fi
+      cd "${GALYLEO_CACHE_DIR}/${conda_env}"
+      cp "${galyleo_launch_dir}/${conda_yml}" ./
+      md5sum -c "${conda_env}.md5"
+      if [[ "${?}" -eq 0 ]]; then # unpack existing conda environment
+        cd "${GALYLEO_CACHE_DIR}"
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
+        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz ./"
         slog append -f "${job_name}.sh" -m "mkdir -p ${conda_env}"
-        slog append -f "${job_name}.sh" -m "tar -xf ${conda_pack} -C ${conda_env}"
+        slog append -f "${job_name}.sh" -m "tar -xf ${conda_env}.tar.gz -C ${conda_env}"
         slog append -f "${job_name}.sh" -m "source ${conda_env}/bin/activate"
         slog append -f "${job_name}.sh" -m 'conda-unpack'
-      elif [[ -z "${conda_pack}" ]] && [[ -n "${conda_yml}" ]]; then
+      else # re/build (and cache) the conda environment
+        cd "${GALYLEO_CACHE_DIR}"
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
+        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml} ./"
         slog append -f "${job_name}.sh" -m 'wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'
         slog append -f "${job_name}.sh" -m 'chmod +x Miniconda3-latest-Linux-x86_64.sh'
         slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniconda3"'
@@ -643,12 +655,20 @@ function galyleo_launch() {
         slog append -f "${job_name}.sh" -m 'source "${CONDA_INSTALL_PATH}/etc/profile.d/conda.sh"'
         slog append -f "${job_name}.sh" -m 'conda activate base'
         if [[ "${conda_mamba}" == 'true' ]]; then
-          slog append -f "${job_name}.sh" -m 'conda install mamba -n base -c conda-forge'
+          slog append -f "${job_name}.sh" -m 'conda install -y mamba -n base -c conda-forge'
           slog append -f "${job_name}.sh" -m "mamba env create --file ${conda_yml}"
         else
           slog append -f "${job_name}.sh" -m "conda env create --file ${conda_yml}"
         fi
         slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
+        if [[ "${conda_cache}" == 'true' ]]; then
+          slog append -f "${job_name}.sh" -m 'conda install -y conda-pack'
+          slog append -f "${job_name}.sh" -m "conda pack -n ${conda_env} -o ${conda_env}.tar.gz"
+          slog append -f "${job_name}.sh" -m "cp ${conda_env}.tar.gz ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz"
+          slog append -f "${job_name}.sh" -m "md5sum ${conda_yml} > ${conda_env}.md5"
+          slog append -f "${job_name}.sh" -m "cp ${conda_env}.md5 ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.md5"
+          slog append -f "${job_name}.sh" -m "cp Miniconda3-latest-Linux-x86_64.sh ${GALYLEO_CACHE_DIR}/${conda_env}/Miniconda3-latest-Linux-x86_64.sh"
+        fi
       fi
     fi
     slog append -f "${job_name}.sh" -m ''
@@ -910,7 +930,7 @@ function galyleo_configure() {
 # ----------------------------------------------------------------------
 function galyleo_clean() {
 
-  rm -r "${GALYLEO_CACHE_DIR}"
+  rm -rf "${GALYLEO_CACHE_DIR}"
 
   return 0
 
@@ -956,7 +976,6 @@ function galyleo_help() {
   slog output -m "       | --nv           : ${singularity_gpu_type}"
   slog output -m "    -e | --env-modules  : ${env_modules}"
   slog output -m "       | --conda-init   : ${conda_init}"
-  slog output -m "       | --conda-pack   : ${conda_pack}"
   slog output -m "       | --conda-env    : ${conda_env}"
   slog output -m "       | --conda-yml    : ${conda_yml}"
   slog output -m "       | --mamba        : ${conda_mamba}"
