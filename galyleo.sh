@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Saturday, November 26th, 2022
+#     Tuesday, November 29th, 2022
 #
 # ----------------------------------------------------------------------
 
@@ -109,7 +109,9 @@ fi
 #      | --conda-init <conda_init>
 #      | --conda-env <conda_env>
 #      | --conda-yml <conda_yml>
+#      | --conda-version <conda_version>
 #      | --mamba <false/true>
+#      | --cache <false/true>
 #      | --disable-checklist <false/true>
 #      | --checklist-timeout <checklist_timeout>
 #   -Q | --quiet
@@ -144,11 +146,11 @@ function galyleo_launch() {
   local jupyter_notebook_dir=''
 
   # Declare input variables associated with system architecture.
-  local galyleo_launch_dir="${PWD}"
+  local galyleo_launch_dir='/home/mkandes/galyleo'
   local local_scratch_dir="${GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR}"
 
   # Declare input variables associated with environment modules.
-  local env_modules="${GALYLEO_DEFAULT_ENV_MODULES}"
+  local env_modules=''
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
@@ -159,6 +161,7 @@ function galyleo_launch() {
   local conda_init=''
   local conda_env=''
   local conda_yml=''
+  local conda_version='latest'
   local conda_mamba='false'
   local conda_cache='false'
 
@@ -272,6 +275,10 @@ function galyleo_launch() {
         conda_yml="${2}"
         shift 2
         ;;
+      --conda-version )
+        conda_version="${2}"
+        shift 2
+        ;;
       --mamba )
         conda_mamba='true'
         shift 1
@@ -322,6 +329,7 @@ function galyleo_launch() {
   slog output -m "       | --conda-init        : ${conda_init}"
   slog output -m "       | --conda-env         : ${conda_env}"
   slog output -m "       | --conda-yml         : ${conda_yml}"
+  slog output -m "       | --conda-version     : ${conda_version}"
   slog output -m "       | --mamba             : ${conda_mamba}"
   slog output -m "       | --cache             : ${conda_cache}"
   slog output -m "       | --disable-checklist : ${disable_checklist}"
@@ -646,12 +654,12 @@ function galyleo_launch() {
         cd "${GALYLEO_CACHE_DIR}"
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
         slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml} ./"
-        slog append -f "${job_name}.sh" -m 'wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'
-        slog append -f "${job_name}.sh" -m 'chmod +x Miniconda3-latest-Linux-x86_64.sh'
+        slog append -f "${job_name}.sh" -m "wget https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}-Linux-x86_64.sh"
+        slog append -f "${job_name}.sh" -m "chmod +x Miniconda3-${conda_version}-Linux-x86_64.sh"
         slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniconda3"'
         slog append -f "${job_name}.sh" -m 'export CONDA_ENVS_PATH="${CONDA_INSTALL_PATH}/envs"'
         slog append -f "${job_name}.sh" -m 'export CONDA_PKGS_DIRS="${CONDA_INSTALL_PATH}/pkgs"'
-        slog append -f "${job_name}.sh" -m './Miniconda3-latest-Linux-x86_64.sh -b -p "${CONDA_INSTALL_PATH}"'
+        slog append -f "${job_name}.sh" -m "./Miniconda3-${conda_version}-Linux-x86_64.sh -b -p \"\${CONDA_INSTALL_PATH}\""
         slog append -f "${job_name}.sh" -m 'source "${CONDA_INSTALL_PATH}/etc/profile.d/conda.sh"'
         slog append -f "${job_name}.sh" -m 'conda activate base'
         if [[ "${conda_mamba}" == 'true' ]]; then
@@ -667,7 +675,7 @@ function galyleo_launch() {
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.tar.gz ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz"
           slog append -f "${job_name}.sh" -m "md5sum ${conda_yml} > ${conda_env}.md5"
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.md5 ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.md5"
-          slog append -f "${job_name}.sh" -m "cp Miniconda3-latest-Linux-x86_64.sh ${GALYLEO_CACHE_DIR}/${conda_env}/Miniconda3-latest-Linux-x86_64.sh"
+          slog append -f "${job_name}.sh" -m "cp Miniconda3-${conda_version}-Linux-x86_64.sh ${GALYLEO_CACHE_DIR}/${conda_env}/Miniconda3-${conda_version}-Linux-x86_64.sh"
         fi
       fi
     fi
@@ -792,7 +800,6 @@ function galyleo_launch() {
 #   -t | --time-limit <time_limit>
 #   -j | --jupyter <jupyter_interface>
 #      | --scratch-dir <local_scratch_dir>
-#   -e | --env-modules <env_modules>
 #
 # Returns:
 #
@@ -818,9 +825,6 @@ function galyleo_configure() {
 
   # Declare input variables associated with system architecture.
   local local_scratch_dir='/tmp'
-
-  # Declare input variables associated with environment modules.
-  local env_modules=''
 
   # Read in command-line options and assign input variables to local
   # variables.
@@ -861,10 +865,6 @@ function galyleo_configure() {
         local_scratch_dir="${2}"
         shift 2
         ;;
-      -e | --env-modules )
-        env_modules="${2}"
-        shift 2
-        ;;
       *)
         slog error -m "Command-line option ${1} not recognized or not supported."
         return 1
@@ -900,7 +900,6 @@ function galyleo_configure() {
      slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_TIME_LIMIT='${time_limit}'"
      slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_JUPYTER_INTERFACE='${jupyter_interface}'"
      slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR='${local_scratch_dir}'"
-     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_ENV_MODULES='${env_modules}'"
 
   fi
 
