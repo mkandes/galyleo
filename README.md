@@ -363,10 +363,14 @@ galyleo launch --account abc123 --partition shared --cpus 8 --memory 16 --time-l
 You can further improve the installation performance and reuse of these 
 dynamically generated conda environments by using the new `--mamba` and
 `--cache` command-line options, which enables the use of 
-[Mamba](https://mamba.readthedocs.io) to speed up software installation
+[Mamba](https://mamba.readthedocs.io) to speed up software installs
 and saves the completed conda environment using 
 [conda-pack](https://conda.github.io/conda-pack) for future reuse, 
 respectively. 
+
+```bash
+galyleo launch --account abc123 --partition shared --cpus 8 --memory 16 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml environment.yml --mamba --cache
+```
    
 <div id='debug'/>
 
@@ -430,7 +434,7 @@ University of California, San Diego
 
 ## Version
 
-0.6.4
+0.6.5
 
 ## Last Updated
 
