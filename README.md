@@ -187,9 +187,9 @@ help you get your work done.
 For example, let's say you need an [R](https://www.r-project.org) 
 environment for your Jupyter notebook session. Why not try the latest 
 [r-notebook container](https://hub.docker.com/r/jupyter/r-notebook) 
-from the [Jupyter Project](https://jupyter-docker-stacks.readthedocs.io)? 
-To get started, you first use the `singularity pull` command to download
-and convert the Docker container to a Singularity container.
+from the [Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io) 
+project? To get started, you first use the `singularity pull` command to 
+download and convert the Docker container to a Singularity container.
 
 ```bash
 singularity pull docker://jupyter/r-notebook:latest
@@ -223,13 +223,12 @@ sure your container includes a CUDA-enabled version of the application
 that can utilize NVIDIA GPUs. 
 
 NVIDIA distributes a number of GPU-optimized containers via their 
-[NVIDIA Container Registry](https://catalog.ngc.nvidia.com). This 
-includes containers for all of the most popular deep learning 
-frameworks --- [PyTorch](https://pytorch.org), 
-[TensorFlow](https://www.tensorflow.org), and 
-[MXNet](https://mxnet.apache.org) --- with `jupyter` pre-installed.
-Like the the containers available from DockerHub, you can use Singularity 
-to `pull` these containers to the HPC system you are working on
+[container registry](https://catalog.ngc.nvidia.com). This includes 
+containers for all of the most popular deep learning frameworks --- 
+[PyTorch](https://pytorch.org), [TensorFlow](https://www.tensorflow.org), 
+and [MXNet](https://mxnet.apache.org) --- with `jupyter` pre-installed.
+Like the the containers available from DockerHub, you can `pull` these 
+containers to the HPC system you are working on
 
 ```bash
 singularity pull docker://nvcr.io/nvidia/pytorch:21.07-py3
@@ -261,7 +260,7 @@ allocated implicitly in proportion to the number of CPU-cores requested
 by a job and available on the type of GPU-accelerated compute node you 
 expect it to run on. And if you would like to request your notebook 
 session be scheduled on a certain type of GPU, then you must pass the 
-type of GPU required (listed in the `pbsnodes` properties) via the 
+type of GPU required listed in the `pbsnodes` properties via the 
 `--constraint` command-line option. For example, the following `launch` 
 command will schedule your session on one of the NVIDIA GeForce RTX ]
 2080Ti GPUs available in the `gpu-hotel` queue on TSCC.
@@ -364,8 +363,8 @@ galyleo launch --account abc123 --partition shared --cpus 8 --memory 16 --time-l
 You can further improve the installation performance and reuse of these 
 dynamically generated conda environments by using the new `--mamba` and
 `--cache` command-line options, which enable the use of the 
-[Mamba](https://mamba.readthedocs.io) package manager to speed up 
-software installs and saves the conda environment using 
+[Mamba](https://mamba.readthedocs.io) to speed up software installs and
+saves the conda environment using 
 [conda-pack](https://conda.github.io/conda-pack), respectively. 
    
 <div id='debug'/>
@@ -430,7 +429,7 @@ University of California, San Diego
 
 ## Version
 
-0.6.2
+0.6.3
 
 ## Last Updated
 
