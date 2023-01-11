@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Tuesday, November 29th, 2022
+#     Wednesday, Janurary 11th, 2022
 #
 # ----------------------------------------------------------------------
 
@@ -146,7 +146,6 @@ function galyleo_launch() {
   local jupyter_notebook_dir=''
 
   # Declare input variables associated with system architecture.
-  local galyleo_launch_dir="${PWD}"
   local local_scratch_dir="${GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR}"
 
   # Declare input variables associated with environment modules.
@@ -639,8 +638,8 @@ function galyleo_launch() {
       if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
         mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
       fi
+      cp "${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}"
       cd "${GALYLEO_CACHE_DIR}/${conda_env}"
-      cp "${galyleo_launch_dir}/${conda_yml}" ./
       md5sum -c "${conda_env}.md5"
       if [[ "${?}" -eq 0 ]]; then # unpack existing conda environment
         cd "${GALYLEO_CACHE_DIR}"
