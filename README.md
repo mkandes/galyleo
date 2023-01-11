@@ -13,6 +13,7 @@ exchanged between the notebook server and your browser, helping protect
 you and your work against network eavesdropping and data tampering. 
 
 - [Quick Start Guide](#quickstart)
+- [Command-line options](#command-line)
 - [Defining your software environment](#softwareenv)
   - [Environment modules](#envmodules)
   - [Singularity containers](#singularity)
@@ -78,6 +79,10 @@ https://wages-astonish-recapture.expanse-user-content.sdsc.edu?token=1abe04ac170
 Copy and paste this HTTPS URL into your web browser. Your Jupyter 
 notebook session will begin once the requested compute resources are
 allocated to your job by the scheduler.
+
+<div id='command-line'/>
+
+## Command-line options
 
 A list of the most commonly used command-line options for the `launch`
 command are described below. 
@@ -430,12 +435,12 @@ Marty Kandes, Ph.D.
 Computational & Data Science Research Specialist  
 High-Performance Computing User Services Group  
 San Diego Supercomputer Center  
-University of California, San Diego  
+University of California, San Diego
 
 ## Version
 
-0.6.5
+0.6.6
 
 ## Last Updated
 
-Saturday, December 3rd, 2022
+Wednesday, January 11th, 2022

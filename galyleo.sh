@@ -146,7 +146,7 @@ function galyleo_launch() {
   local jupyter_notebook_dir=''
 
   # Declare input variables associated with system architecture.
-  local galyleo_launch_dir='/home/mkandes/galyleo'
+  local galyleo_launch_dir="${PWD}"
   local local_scratch_dir="${GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR}"
 
   # Declare input variables associated with environment modules.
