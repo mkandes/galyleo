@@ -638,7 +638,7 @@ function galyleo_launch() {
       if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
         mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
       fi
-      cp "${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}"
+      cp "${OLDPWD}/${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml}"
       cd "${GALYLEO_CACHE_DIR}/${conda_env}"
       md5sum -c "${conda_env}.md5"
       if [[ "${?}" -eq 0 ]]; then # unpack existing conda environment
