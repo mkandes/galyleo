@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Wednesday, Janurary 11th, 2022
+#     Monday, Janurary 23rd, 2023
 #
 # ----------------------------------------------------------------------
 
@@ -600,7 +600,7 @@ function galyleo_launch() {
     if [[ "${GALYLEO_SCHEDULER}" == 'slurm' ]]; then
       slog append -f "${job_name}.sh" -m 'declare -xr GALYLEO_LAUNCH_DIR="${SLURM_SUBMIT_DIR}"'
     elif [[ "${GALYLEO_SCHEDULER}" == 'pbs' ]]; then
-      slog append -f "${job_name}.sh" -m 'declare -xr GALYLEO_LAUNCH_DIR=${PBS_O_WORKDIR}"'
+      slog append -f "${job_name}.sh" -m 'declare -xr GALYLEO_LAUNCH_DIR="${PBS_O_WORKDIR}"'
     fi
 
     slog append -f "${job_name}.sh" -m "declare -xr LOCAL_SCRATCH_DIR=${local_scratch_dir}"
