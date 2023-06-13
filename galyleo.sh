@@ -33,7 +33,7 @@
 #
 # LAST UPDATED
 #
-#     Monday, Janurary 23rd, 2023
+#     Tuesday, June 13th, 2023
 #
 # ----------------------------------------------------------------------
 
@@ -93,6 +93,7 @@ fi
 #   -R | --reservation <reservation>
 #   -p | --partition <partition>
 #   -q | --qos <qos>
+#   -N | --nodes <nodes>
 #   -c | --cpus <cpus_per_task>
 #   -m | --memory <memory_per_node> (in units of GB)
 #   -g | --gpus <gpus>
@@ -110,9 +111,10 @@ fi
 #      | --conda-env <conda_env>
 #      | --conda-yml <conda_yml>
 #      | --conda-version <conda_version>
-#      | --mamba <false/true>
-#      | --cache <false/true>
-#      | --disable-checklist <false/true>
+#      | --mamba
+#      | --cache
+#      | --spark-home <spark_home>
+#      | --disable-checklist
 #      | --checklist-timeout <checklist_timeout>
 #   -Q | --quiet
 #
@@ -163,6 +165,9 @@ function galyleo_launch() {
   local conda_version='latest'
   local conda_mamba='false'
   local conda_cache='false'
+
+  # Declare input variables associated with auxillary applications. e.g. Spark, Tensorboard
+  local spark_home=''
 
   # Declare input variables associated with error checking.
   local disable_checklist='false'
@@ -286,6 +291,10 @@ function galyleo_launch() {
         conda_cache='true'
         shift 1
         ;;
+      --spark-home )
+        spark_home="${2}"
+        shift 2
+        ;;
       --disable-checklist )
         disable_checklist='true'
         shift 1
@@ -312,6 +321,7 @@ function galyleo_launch() {
   slog output -m "    -R | --reservation       : ${reservation}"
   slog output -m "    -p | --partition         : ${partition}"
   slog output -m "    -q | --qos               : ${qos}"
+  slog output -m "    -N | --nodes             : ${nodes}"
   slog output -m "    -c | --cpus              : ${cpus_per_task}"
   slog output -m "    -m | --memory            : ${memory_per_node} GB"
   slog output -m "    -g | --gpus              : ${gpus}"
@@ -331,6 +341,7 @@ function galyleo_launch() {
   slog output -m "       | --conda-version     : ${conda_version}"
   slog output -m "       | --mamba             : ${conda_mamba}"
   slog output -m "       | --cache             : ${conda_cache}"
+  slog output -m "       | --spark-home        : ${spark_home}"
   slog output -m "       | --disable-checklist : ${disable_checklist}"
   slog output -m "       | --checklist-timeout : ${checklist_timeout} s"
   slog output -m "    -Q | --quiet             : ${SLOG_LEVEL}"
@@ -680,6 +691,70 @@ function galyleo_launch() {
     fi
     slog append -f "${job_name}.sh" -m ''
 
+    # Configure and startup a standalone Spark cluster.
+    if [[ -n "${spark_home}" ]]; then
+      slog append -f "${job_name}.sh" -m "export SPARK_HOME=${spark_home}"
+     
+      slog append -f "${job_name}.sh" -m 'export SPARK_MASTER_HOST="$(hostname -s).${GALYLEO_DNS_DOMAIN}"'
+      slog append -f "${job_name}.sh" -m 'export SPARK_MASTER_PORT=7777'
+
+      slog append -f "${job_name}.sh" -m "export SPARK_DAEMON_MEMORY='8g'"
+
+      slog append -f "${job_name}.sh" -m "export SPARK_WORKER_CORES=${cpus_per_task}"
+      slog append -f "${job_name}.sh" -m "export SPARK_WORKER_MEMORY=${memory_per_node}g"
+
+      slog append -f "${job_name}.sh" -m 'export SPARK_CACHE_DIR="${HOME}/.spark/${SLURM_JOB_ID}"'
+      slog append -f "${job_name}.sh" -m 'export SPARK_CONF_DIR="${SPARK_CACHE_DIR}/conf"'
+      slog append -f "${job_name}.sh" -m 'export SPARK_LOG_DIR="${SPARK_CACHE_DIR}/logs"'
+      slog append -f "${job_name}.sh" -m 'export SPARK_WORKER_DIR="${SPARK_CACHE_DIR}/work"'
+
+      slog append -f "${job_name}.sh" -m 'export SPARK_LOCAL_DIRS="${LOCAL_SCRATCH_DIR}"'
+
+      slog append -f "${job_name}.sh" -m 'export PATH="${SPARK_HOME}/bin:${PATH}"'
+      slog append -f "${job_name}.sh" -m 'export PATH="${SPARK_HOME}/sbin:${PATH}"'
+
+      slog append -f "${job_name}.sh" -m 'export PYSPARK_PYTHON="$(which python)"'
+      slog append -f "${job_name}.sh" -m 'export PYTHONPATH=$(ZIPS=("$SPARK_HOME"/python/lib/*.zip); IFS=:; echo "${ZIPS[*]}"):$PYTHONPATH'
+
+      slog append -f "${job_name}.sh" -m 'mkdir -p "${SPARK_CONF_DIR}"'
+
+      slog append -f "${job_name}.sh" -m 'echo "#!/usr/bin/env bash" > "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_HOME=${SPARK_HOME}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_MASTER_HOST=${SPARK_MASTER_HOST}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_MASTER_PORT=${SPARK_MASTER_PORT}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_DAEMON_MEMORY=${SPARK_DAEMON_MEMORY}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_WORKER_CORES=${SPARK_WORKER_CORES}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_CACHE_DIR=${SPARK_CACHE_DIR}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_CONF_DIR=${SPARK_CONF_DIR}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_LOG_DIR=${SPARK_LOG_DIR}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_WORKER_DIR=${SPARK_WORKER_DIR}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export SPARK_LOCAL_DIRS=${SPARK_LOCAL_DIRS}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export PATH=${PATH}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export PYSPARK_PYTHON=${PYSPARK_PYTHON}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+      slog append -f "${job_name}.sh" -m 'echo "export PYTHONPATH=${PYTHONPATH}" >> "${SPARK_CONF_DIR}/spark-env.sh"'
+
+      slog append -f "${job_name}.sh" -m 'start-master.sh'
+
+      slog append -f "${job_name}.sh" -m 'readarray -t spark_workers <<< "$(scontrol show hostnames ${SLURM_NODELIST})"'
+      #slog append -f "${job_name}.sh" -m 'for spark_worker in "${spark_workers[@]}"; do'
+      #slog append -f "${job_name}.sh" -m '  echo "${spark_worker}.${GALYLEO_DNS_DOMAIN}" >> "${SPARK_CONF_DIR}/workers"'
+      #slog append -f "${job_name}.sh" -m 'done'
+
+      #slog append -f "${job_name}.sh" -m 'start-all.sh'
+
+      slog append -f "${job_name}.sh" -m 'for spark_worker in "${spark_workers[@]}"; do'
+      slog append -f "${job_name}.sh" -m '  ssh "${spark_worker}" "source ${SPARK_CONF_DIR}/spark-env.sh; start-worker.sh spark://${SPARK_MASTER_HOST}:${SPARK_MASTER_PORT} --host ${spark_worker}.${GALYLEO_DNS_DOMAIN}"'
+      slog append -f "${job_name}.sh" -m 'done'
+
+      #slog append -f "${job_name}.sh" -m 'for spark_worker in "${spark_workers[@]}"; do'
+      #slog append -f "${job_name}.sh" -m '  srun --nodes=1 --nodelist="${spark_worker}" --ntasks=1 start-worker.sh spark://${SPARK_MASTER_HOST}:${SPARK_MASTER_PORT} --host ${spark_worker}.eth.cluster'
+      #slog append -f "${job_name}.sh" -m 'done'
+
+      #slog append -f "${job_name}.sh" -m "srun --nodes=\${SLURM_NNODES} --ntasks=\${SLURM_NNODES} --ntasks-per-node=1 start-worker.sh spark://\${SPARK_MASTER_HOST}:\${SPARK_MASTER_PORT} --host "
+    fi
+    slog append -f "${job_name}.sh" -m ''
+
     # Change job working directory (from GALYLEO_CACHE_DIR) to jupyter_notebook_dir.
     slog append -f "${job_name}.sh" -m "cd ${jupyter_notebook_dir}"
     slog append -f "${job_name}.sh" -m ''
@@ -725,6 +800,12 @@ function galyleo_launch() {
     # Wait for the Jupyter server to be shutdown by the user.
     slog append -f "${job_name}.sh" -m 'wait'
     slog append -f "${job_name}.sh" -m ''
+
+    # If a standalone Spark cluster may be running, then shut it down.
+    if [[ -n "${spark_home}" ]]; then
+      slog append -f "${job_name}.sh" -m 'stop-all.sh'
+      slog append -f "${job_name}.sh" -m ''
+    fi
 
     # Revoke the connection token from reverse proxy service once the
     # Jupyter server has been shutdown.
@@ -956,29 +1037,34 @@ function galyleo_help() {
 
   slog output -m 'USAGE: galyleo launch [command-line option] {value}'
   slog output -m '  command-line options  : (default) values'
-  slog output -m "    -A | --account      : ${account}"
-  slog output -m "    -R | --reservation  : ${reservation}"
-  slog output -m "    -p | --partition    : ${partition}"
-  slog output -m "    -q | --qos          : ${qos}"
-  slog output -m "    -c | --cpus         : ${cpus_per_task}"
-  slog output -m "    -m | --memory       : ${memory_per_node} GB"
-  slog output -m "    -g | --gpus         : ${gpus}"
-  slog output -m "       | --gres         : ${gres}"
-  slog output -m "    -t | --time-limit   : ${time_limit}"
-  slog output -m "    -j | --jupyter      : ${jupyter_interface}"
-  slog output -m "    -d | --notebook-dir : ${jupyter_notebook_dir}"
-  slog output -m "       | --scratch-dir  : ${local_scratch_dir}"
-  slog output -m "    -e | --env-modules  : ${env_modules}"
-  slog output -m "    -s | --sif          : ${singularity_image_file}"
-  slog output -m "    -B | --bind         : ${singularity_bind_mounts}"
-  slog output -m "       | --nv           : ${singularity_gpu_type}"
-  slog output -m "    -e | --env-modules  : ${env_modules}"
-  slog output -m "       | --conda-init   : ${conda_init}"
-  slog output -m "       | --conda-env    : ${conda_env}"
-  slog output -m "       | --conda-yml    : ${conda_yml}"
-  slog output -m "       | --mamba        : ${conda_mamba}"
-  slog output -m "    -Q | --quiet        : ${SLOG_LEVEL}"
-  slog output -m ''
+  slog output -m "    -A | --account           : ${account}"
+  slog output -m "    -R | --reservation       : ${reservation}"
+  slog output -m "    -p | --partition         : ${partition}"
+  slog output -m "    -q | --qos               : ${qos}"
+  slog output -m "    -N | --nodes             : ${nodes}"
+  slog output -m "    -c | --cpus              : ${cpus_per_task}"
+  slog output -m "    -m | --memory            : ${memory_per_node} GB"
+  slog output -m "    -g | --gpus              : ${gpus}"
+  slog output -m "       | --gres              : ${gres}"
+  slog output -m "    -t | --time-limit        : ${time_limit}"
+  slog output -m "    -C | --constraint        : ${constraint}"
+  slog output -m "    -j | --jupyter           : ${jupyter_interface}"
+  slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
+  slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
+  slog output -m "    -e | --env-modules       : ${env_modules}"
+  slog output -m "    -s | --sif               : ${singularity_image_file}"
+  slog output -m "    -B | --bind              : ${singularity_bind_mounts}"
+  slog output -m "       | --nv                : ${singularity_gpu_type}"
+  slog output -m "       | --conda-init        : ${conda_init}"
+  slog output -m "       | --conda-env         : ${conda_env}"
+  slog output -m "       | --conda-yml         : ${conda_yml}"
+  slog output -m "       | --conda-version     : ${conda_version}"
+  slog output -m "       | --mamba             : ${conda_mamba}"
+  slog output -m "       | --cache             : ${conda_cache}"
+  slog output -m "       | --spark-home        : ${spark_home}"
+  slog output -m "       | --disable-checklist : ${disable_checklist}"
+  slog output -m "       | --checklist-timeout : ${checklist_timeout} s"
+  slog output -m "    -Q | --quiet             : ${SLOG_LEVEL}"
 
   return 0
 

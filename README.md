@@ -399,7 +399,7 @@ Jupyter notebooks on Expanse. After logging into the portal, you can
 access this web-based interface to `galyleo` from the *Interactive Apps*
 tab in the toolbar across the top of your browser, then select *Jupyter*. 
 
-### naked-singularity containers
+### Containers
 
 SDSC builds and maintains a number of [custom Singularity containers for
 use on its HPC systems](https://github.com/mkandes/naked-singularity). 
@@ -439,8 +439,8 @@ University of California, San Diego
 
 ## Version
 
-0.6.9
+0.7.0
 
 ## Last Updated
 
-Monday, January 23rd, 2023
+Tuesday, June 13th, 2023
