@@ -61,12 +61,12 @@ location of the notebook working directory; and
 and the other software packages you want to work with during the session.
 
 For example, the following `launch` command will create a 30-minute 
-JupyterLab session on a single CPU core with 2 GB of memory on one of
+JupyterLab session on two CPU-cores with 4 GB of memory on one of
 Expanse's `shared` AMD compute nodes using the base `anaconda3` 
 distribution available in its default `cpu` software module environment.
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --env-modules cpu,anaconda3
+galyleo launch --account abc123 --partition shared --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules cpu/0.17.3b,anaconda3/2021.05
 ```
 
 When the `launch` command completes successfully, you will be issued a 
@@ -158,7 +158,7 @@ the [Anaconda](https://www.anaconda.com) distributions available in its
 software module environment.
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --env-modules cpu,anaconda3
+galyleo launch --account abc123 --partition shared --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules cpu/0.17.3b,anaconda3/2021.05
 ```
 
 By default, each Anaconda distribution comes with over 250 of the most 
@@ -205,14 +205,14 @@ the container conversion process is complete, you can then `launch` your
 Jupyter notebook session with the newly built Singularity container.
 
 ```bash
-galyleo launch --account abc123 --cpus 1 --memory 2 --time-limit 00:30:00 --sif r-notebook_latest.sif
+galyleo launch --account abc123 --cpus 2 --memory 4 --time-limit 00:30:00 --sif r-notebook_latest.sif
 ```
 
 On some systems like Expanse, you may need to load Singularity via the 
 software module environment as well.
 
 ```bash
-galyleo launch --account abc123 --cpus 1 --memory 2 --time-limit 00:30:00 --env-modules singularitypro --sif r-notebook_latest.sif --bind /expanse,/scratch
+galyleo launch --account abc123 --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules singularitypro --sif r-notebook_latest.sif --bind /expanse,/scratch
 ```
 
 Here, the user-defined `--bind` mount option also enables access to both
@@ -319,16 +319,15 @@ dependencies:
   - pandas=1.2.4
   - matplotlib=3.4.2
   - seaborn=0.11.0
-  - ipywidgets=7.6.2
   - scikit-learn=0.23.2
 ``` 
 
 You should then be able to `launch` a 30-minute JupyterLab session on a
-single CPU core with 2 GB of memory on one of Expanse's `shared` AMD 
+four CPU-cores with 8 GB of memory on one of Expanse's `shared` AMD 
 compute nodes by simply activating the `notebooks-sharing` environment.
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --conda-env notebooks-sharing
+galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing
 ```
 Note, however, the use of the `--conda-env` command-line option here
 assumes you've already configured your `~/.bashrc` file with the `conda
@@ -338,7 +337,7 @@ by providing the path to its `conda.sh` initialization script in the
 `etc/profile.d` directory via the `--conda-init` command-line option.
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 1 --memory 2 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-init miniconda3/etc/profile.d/conda.sh
+galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-init miniconda3/etc/profile.d/conda.sh
 ```
 
 While creating your own custom software environment with conda may be 
@@ -362,7 +361,7 @@ notebook session with the `notebooks-sharing` environment, you would use
 the following command:
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 8 --memory 16 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml environment.yml
+galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml environment.yml
 ```
 
 You can further improve the installation performance and reuse of these 
@@ -374,7 +373,7 @@ and saves the completed conda environment using
 respectively. 
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 8 --memory 16 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml environment.yml --mamba --cache
+galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml environment.yml --mamba --cache
 ```
    
 <div id='debug'/>
@@ -439,8 +438,8 @@ University of California, San Diego
 
 ## Version
 
-0.7.0
+0.7.1
 
 ## Last Updated
 
-Tuesday, June 13th, 2023
+Thursday, July 6th, 2023
