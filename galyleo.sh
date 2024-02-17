@@ -560,7 +560,7 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m ''
 
     # Load environment modules specified by the user.
-    slog append -f "${job_name}.sh" -m 'module purge'
+    slog append -f "${job_name}.sh" -m 'module reset'
     if [[ -n "${env_modules}" ]]; then
       IFS=','
       read -r -a modules <<< "${env_modules}"
