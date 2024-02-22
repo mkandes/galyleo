@@ -34,7 +34,7 @@
 #
 # LAST UPDATED
 #
-#     Friday, February 16th, 2024
+#     Wednesday, February 21st, 2024
 #
 # ----------------------------------------------------------------------
 
@@ -399,7 +399,7 @@ function galyleo_launch() {
     if [[ -n "${env_modules}" ]]; then
       IFS=','
       read -r -a modules <<< "${env_modules}"
-      unset IFS
+      IFS=$' \t\n'
       for module in "${modules[@]}"; do
         module load "${module}"
         if [[ $? -ne 0 ]]; then
