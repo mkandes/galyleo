@@ -35,19 +35,9 @@ To use `galyleo`, you first need to prepend its install location to your
 `PATH` environment variable. This path is different for each HPC system
 at SDSC. 
 
-On Comet, use:
-```bash
-export PATH="/share/apps/compute/galyleo:${PATH}"
-```
-
 On Expanse, use:
 ```bash
 export PATH="/cm/shared/apps/sdsc/galyleo:${PATH}"
-```
-
-On TSCC, use:
-```bash
-export PATH="/projects/builder-group/galyleo:${PATH}"
 ```
 
 Once `galyleo` is in your `PATH`, you can then use its `launch` command
@@ -101,8 +91,8 @@ job should be submitted to
 compute node required for the job
 
 Jupyter options:
-- `-j, --jupyter`: select the user interface for the Jupyter notebook 
-  session; the only options are *lab* or *notebook*
+- `-i, --interface`: select the user interface for the Jupyter notebook 
+  session; the only options are *lab* or *notebook* or *voila*
 - `-d, --notebook-dir`: path to the working directory where the Jupyter 
   notebook session will start; default value is your `$HOME` directory
 
@@ -408,15 +398,8 @@ locations for the latest containers. If you do not find the container
 you're looking for, please feel free to contact us and make a request
 for a container to be made available.
 
-On Comet:
-- `/share/apps/compute/singularity/images`
-- `/share/apps/gpu/singularity/images`
-
 On Expanse:
 - `/cm/shared/apps/containers/singularity`
-
-On TSCC:
-- `/projects/builder-group/singularity`
 
 ## Status
 
@@ -439,8 +422,8 @@ University of California, San Diego
 
 ## Version
 
-0.7.4
+0.7.5
 
 ## Last Updated
 
-Saturday, February 17th, 2024
+Sunday, April 28th, 2024

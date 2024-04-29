@@ -34,7 +34,7 @@
 #
 # LAST UPDATED
 #
-#     Wednesday, February 21st, 2024
+#     Sunday, April 28th, 2024
 #
 # ----------------------------------------------------------------------
 
@@ -101,7 +101,7 @@ fi
 #      | --gres <gres>
 #   -t | --time-limit <time_limit>
 #   -C | --constraint <constraint>
-#   -j | --jupyter <jupyter_interface>
+#   -i | --interface <jupyter_interface>
 #   -d | --notebook-dir <jupyter_notebook_dir>
 #      | --scratch-dir <local_scratch_dir>
 #   -e | --env-modules <env_modules>
@@ -236,6 +236,10 @@ function galyleo_launch() {
         constraint="${2}"
         shift 2
         ;;
+      -i | --interface )
+        jupyter_interface="${2}"
+        shift 2
+        ;;
       -j | --jupyter )
         jupyter_interface="${2}"
         shift 2
@@ -329,7 +333,7 @@ function galyleo_launch() {
   slog output -m "       | --gres              : ${gres}"
   slog output -m "    -t | --time-limit        : ${time_limit}"
   slog output -m "    -C | --constraint        : ${constraint}"
-  slog output -m "    -j | --jupyter           : ${jupyter_interface}"
+  slog output -m "    -i | --interface         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
   slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
   slog output -m "    -e | --env-modules       : ${env_modules}"
@@ -366,9 +370,11 @@ function galyleo_launch() {
         ;;
       'notebook' )
         ;;
+      'voila' )
+        ;;
       *)
       slog error -m "Not a valid Jupyter user interface: ${jupyter_interface}"
-      slog error -m "Only --jupyter lab OR --jupyter notebook are allowed."
+      slog error -m "Only --interface lab OR --interface notebook OR --interface voila are allowed."
       return 1
     esac
 
@@ -614,7 +620,6 @@ function galyleo_launch() {
         else
           slog append -f "${job_name}.sh" -m "conda env create --file ${conda_yml}"
         fi
-        slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
         if [[ "${conda_cache}" == 'true' ]]; then
           slog append -f "${job_name}.sh" -m 'conda install -y conda-pack'
           slog append -f "${job_name}.sh" -m "conda pack -n ${conda_env} -o ${conda_env}.tar.gz"
@@ -623,6 +628,7 @@ function galyleo_launch() {
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.md5 ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.md5"
           slog append -f "${job_name}.sh" -m "cp Miniconda3-${conda_version}-Linux-x86_64.sh ${GALYLEO_CACHE_DIR}/${conda_env}/Miniconda3-${conda_version}-Linux-x86_64.sh"
         fi
+        slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
       fi
     fi
     slog append -f "${job_name}.sh" -m ''
@@ -720,13 +726,22 @@ function galyleo_launch() {
       slog append -f "${job_name}.sh" -m "  ${singularity_image_file} \\"
     fi
 
-    # Run the Jupyter server process in the backgroud.
-    slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${GALYLEO_DNS_DOMAIN}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
-    slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
-    slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
-    slog append -f "${job_name}.sh" -m '  exit 1'
-    slog append -f "${job_name}.sh" -m 'fi'
-    slog append -f "${job_name}.sh" -m ''
+    if [[ "${jupyter_interface}" == 'voila' ]]; then
+      slog append -f "${job_name}.sh" -m "voila --Voila.ip=\"\$(hostname -s).${GALYLEO_DNS_DOMAIN}\" --port=\"\${JUPYTER_PORT}\" --Voila.tornado_settings=allow_origin='*' --no-browser &"
+      slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
+      slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Voila.'"
+      slog append -f "${job_name}.sh" -m '  exit 1'
+      slog append -f "${job_name}.sh" -m 'fi'
+      slog append -f "${job_name}.sh" -m ''
+    else
+      # Run the Jupyter server process in the backgroud.
+      slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${GALYLEO_DNS_DOMAIN}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
+      slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
+      slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
+      slog append -f "${job_name}.sh" -m '  exit 1'
+      slog append -f "${job_name}.sh" -m 'fi'
+      slog append -f "${job_name}.sh" -m ''
+    fi
 
     # Redeem the connection token from reverse proxy service to enable
     # proxy mapping.
@@ -774,7 +789,7 @@ function galyleo_launch() {
   slog output -m 'Please copy and paste the HTTPS URL provided below into your web browser.'
   slog output -m 'Do not share this URL with others. It is the password to your Jupyter notebook session.'
   slog output -m 'Your Jupyter notebook session will begin once compute resources are allocated to your job by the scheduler.'
-  echo "https://${REVERSE_PROXY_TOKEN}.${GALYLEO_REVERSE_PROXY_FQDN}?token=${JUPYTER_TOKEN}"
+  echo "https://${REVERSE_PROXY_TOKEN}.${GALYLEO_REVERSE_PROXY_FQDN}/?token=${JUPYTER_TOKEN}"
 
   return 0
 
@@ -802,7 +817,7 @@ function galyleo_launch() {
 #   -c | --cpus <cpus_per_task>
 #   -m | --memory <memory_per_node> (in units of GB)
 #   -t | --time-limit <time_limit>
-#   -j | --jupyter <jupyter_interface>
+#   -i | --interface <jupyter_interface>
 #      | --scratch-dir <local_scratch_dir>
 #
 # Returns:
@@ -859,6 +874,10 @@ function galyleo_configure() {
         ;;
       -t | --time-limit )
         time_limit="${2}"
+        shift 2
+        ;;
+      -i | --interface )
+        jupyter_interface="${2}"
         shift 2
         ;;
       -j | --jupyter )
@@ -972,7 +991,7 @@ function galyleo_help() {
   slog output -m "       | --gres              : ${gres}"
   slog output -m "    -t | --time-limit        : ${time_limit}"
   slog output -m "    -C | --constraint        : ${constraint}"
-  slog output -m "    -j | --jupyter           : ${jupyter_interface}"
+  slog output -m "    -i | --interface         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
   slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
   slog output -m "    -e | --env-modules       : ${env_modules}"
