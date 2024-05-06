@@ -27,7 +27,6 @@ you and your work against network eavesdropping and data tampering.
 
 `galyleo` is currently deployed on the following HPC systems at SDSC:
 
-- [Comet](https://www.sdsc.edu/support/user_guides/comet.html)
 - [Expanse](https://expanse.sdsc.edu)
 - [Triton Shared Compute Cluster (TSCC)](https://www.sdsc.edu/support/user_guides/tscc.html)
 
@@ -38,6 +37,22 @@ at SDSC.
 On Expanse, use:
 ```bash
 export PATH="/cm/shared/apps/sdsc/galyleo:${PATH}"
+```
+
+On TSCC, there is now a software module available for loading `galyleo` into your environment.
+
+```
+[mkandes@login1 ~]$ module load galyleo/0.7.4 
+[mkandes@login1 ~]$ module list
+
+Currently Loaded Modules:
+  1) shared   2) cpu/0.17.3   3) slurm/tscc/23.02.7   4) sdsc/1.0   5) DefaultModules   6) galyleo/0.7.4
+
+[mkandes@login1 ~]$ which galyleo
+/cm/shared/apps/spack/0.17.3/cpu/opt/spack/linux-rocky9-cascadelake/gcc-11.2.0/galyleo-0.7.4/galyleo
+[mkandes@login1 ~]$ echo $PATH
+/cm/shared/apps/spack/0.17.3/cpu/opt/spack/linux-rocky9-cascadelake/gcc-11.2.0/galyleo-0.7.4:/tscc/nfs/home/mkandes/.local/bin:/tscc/nfs/home/mkandes/bin:/cm/shared/apps/sdsc/1.0/bin:/cm/shared/apps/sdsc/1.0/sbin:/cm/shared/apps/slurm/current/sbin:/cm/shared/apps/slurm/current/bin:/cm/shared/apps/spack/0.17.3/cpu/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+[mkandes@login1 ~]$
 ```
 
 Once `galyleo` is in your `PATH`, you can then use its `launch` command
@@ -422,8 +437,8 @@ University of California, San Diego
 
 ## Version
 
-0.7.5
+0.7.6
 
 ## Last Updated
 
-Sunday, April 28th, 2024
+Monday, May 6th, 2024
