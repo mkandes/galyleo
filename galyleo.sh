@@ -42,7 +42,6 @@
 # of galyleo. DO NOT leave as PWD when deployed in production. In the
 # future, may include a Makefile with a PREFIX option to install
 # correctly and set this variable. e.g., https://github.com/oyvinev/log.sh
-
 declare -xr GALYLEO_INSTALL_DIR="${PWD}"
 
 # Declare a global environment variable to set the galyleo cache
@@ -105,6 +104,7 @@ fi
 #   -d | --notebook-dir <jupyter_notebook_dir>
 #      | --scratch-dir <local_scratch_dir>
 #   -e | --env-modules <env_modules>
+#      | --append-modulepath <append_modpath>
 #   -s | --sif <singularity_image_file>
 #   -B | --bind <singularity_bind_mounts>
 #      | --nv
@@ -153,6 +153,10 @@ function galyleo_launch() {
 
   # Declare input variables associated with environment modules.
   local env_modules=''
+
+  # Declare directories that append MODULEPATH environment variable
+  local append_modpath=''
+
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
@@ -256,6 +260,10 @@ function galyleo_launch() {
         env_modules="${2}"
         shift 2
         ;;
+      --append-modulepath)
+        append_modpath="${2}"
+        shift 2
+        ;;
       -s | --sif )
         singularity_image_file="${2}"
         shift 2
@@ -337,6 +345,7 @@ function galyleo_launch() {
   slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
   slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
   slog output -m "    -e | --env-modules       : ${env_modules}"
+  slog output -m "    --append-modulepath      : ${append_modpath}"
   slog output -m "    -s | --sif               : ${singularity_image_file}"
   slog output -m "    -B | --bind              : ${singularity_bind_mounts}"
   slog output -m "       | --nv                : ${singularity_gpu_type}"
@@ -400,6 +409,19 @@ function galyleo_launch() {
       return 1
     fi
 
+    # Check whether the directory(ies) to be append to MODULEPATH exists and
+    # are accessible, if not halt the launch. 
+    if [[ -n "${append_modpath}" ]]; then
+        for mpath_name in $(sed 's/,/ /g' <<< "$append_modpath"); do
+            if [[ ! -d "${mpath_name}" ]] \
+                || [[ ! -r "${mpath_name}" ]]; then
+                slog error -m "directory to append MODULE path not found: ${mpath_name}"
+                return 1
+            fi
+        done
+    fi
+
+
     # Check if all environment modules specified by the user, if any, are
     # available and can be loaded successfully. If not, then halt the launch.
     if [[ -n "${env_modules}" ]]; then
@@ -414,6 +436,8 @@ function galyleo_launch() {
         fi
       done
     fi
+
+
 
     # Check if the conda environment specified by the user, if any, can be
     # initialized and activated successfully. If not, then halt the launch.
@@ -567,6 +591,16 @@ function galyleo_launch() {
 
     # Load environment modules specified by the user.
     slog append -f "${job_name}.sh" -m 'module reset'
+
+    # Append MODULEPATH with user specified directories
+
+    if [[ -n "$append_modpath" ]]; then
+        append_modpath=$(sed 's/,/:/g' <<< "$append_modpath")
+        slog append -f "${job_name}.sh" \
+          -m 'export MODULEPATH=${MODULEPATH}:'"${append_modpath}"
+    fi
+
+
     if [[ -n "${env_modules}" ]]; then
       IFS=','
       read -r -a modules <<< "${env_modules}"
@@ -995,6 +1029,7 @@ function galyleo_help() {
   slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
   slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
   slog output -m "    -e | --env-modules       : ${env_modules}"
+  slog output -m "    --append-modulepath      : ${append_modpath}"
   slog output -m "    -s | --sif               : ${singularity_image_file}"
   slog output -m "    -B | --bind              : ${singularity_bind_mounts}"
   slog output -m "       | --nv                : ${singularity_gpu_type}"
