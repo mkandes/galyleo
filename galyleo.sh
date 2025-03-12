@@ -34,7 +34,7 @@
 #
 # LAST UPDATED
 #
-#     Sunday, April 28th, 2024
+#     Wednesday, March 12th, 2025
 #
 # ----------------------------------------------------------------------
 
@@ -156,7 +156,6 @@ function galyleo_launch() {
 
   # Declare directories that append MODULEPATH environment variable
   local append_modpath=''
-
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
@@ -345,7 +344,7 @@ function galyleo_launch() {
   slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
   slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
   slog output -m "    -e | --env-modules       : ${env_modules}"
-  slog output -m "    --append-modulepath      : ${append_modpath}"
+  slog output -m "       | --append-modulepath : ${append_modpath}"
   slog output -m "    -s | --sif               : ${singularity_image_file}"
   slog output -m "    -B | --bind              : ${singularity_bind_mounts}"
   slog output -m "       | --nv                : ${singularity_gpu_type}"
@@ -409,18 +408,16 @@ function galyleo_launch() {
       return 1
     fi
 
-    # Check whether the directory(ies) to be append to MODULEPATH exists and
-    # are accessible, if not halt the launch. 
+    # Check if any directories to be append to MODULEPATH exist and
+    # are accessible. If they are not, then halt the launch.
     if [[ -n "${append_modpath}" ]]; then
-        for mpath_name in $(sed 's/,/ /g' <<< "$append_modpath"); do
-            if [[ ! -d "${mpath_name}" ]] \
-                || [[ ! -r "${mpath_name}" ]]; then
-                slog error -m "directory to append MODULE path not found: ${mpath_name}"
-                return 1
-            fi
-        done
+      for mpath_name in $(sed 's/,/ /g' <<< "$append_modpath"); do
+        if [[ ! -d "${mpath_name}" ]] || [[ ! -r "${mpath_name}" ]]; then
+          slog error -m "directory to append MODULE path not found: ${mpath_name}"
+          return 1
+        fi
+      done
     fi
-
 
     # Check if all environment modules specified by the user, if any, are
     # available and can be loaded successfully. If not, then halt the launch.
@@ -437,8 +434,6 @@ function galyleo_launch() {
       done
     fi
 
-
-
     # Check if the conda environment specified by the user, if any, can be
     # initialized and activated successfully. If not, then halt the launch.
     if [[ -n "${conda_env}" ]] && [[ -z "${conda_yml}" ]]; then
@@ -452,11 +447,14 @@ function galyleo_launch() {
         slog error -m "conda environment could not be activated: ${conda_env}"
         return 1
       fi
-    elif [[ -n "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
+    elif [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
       if [[ ! -f "${conda_yml}" ]]; then
         slog error -m "conda environment yaml file not found: ${conda_yml}"
         return 1
       fi
+    elif [[ -n "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
+      slog error -m "--conda-env and --conda-yml options should no longer be used together."
+      return 1
     fi
 
     # Check if the Singularity container image file specified by the user,
@@ -589,18 +587,16 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m 'declare -i random_ephemeral_port=-1'
     slog append -f "${job_name}.sh" -m ''
 
-    # Load environment modules specified by the user.
+    # Reset module environment to default set.
     slog append -f "${job_name}.sh" -m 'module reset'
 
     # Append MODULEPATH with user specified directories
-
     if [[ -n "$append_modpath" ]]; then
-        append_modpath=$(sed 's/,/:/g' <<< "$append_modpath")
-        slog append -f "${job_name}.sh" \
-          -m 'export MODULEPATH=${MODULEPATH}:'"${append_modpath}"
+      append_modpath=$(sed 's/,/:/g' <<< "$append_modpath")
+      slog append -f "${job_name}.sh" -m 'export MODULEPATH=${MODULEPATH}:'"${append_modpath}"
     fi
 
-
+    # Load environment modules specified by the user.
     if [[ -n "${env_modules}" ]]; then
       IFS=','
       read -r -a modules <<< "${env_modules}"
@@ -621,7 +617,8 @@ function galyleo_launch() {
     fi
 
     # Create and/or activate a dynamically generated conda environment specified by the user.
-    if [[ -n "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
+    if [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
+      conda_env="$(grep name: ${OLDPWD}/${conda_yml} | awk '{print $2}')"
       if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
         mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
       fi

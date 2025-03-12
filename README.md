@@ -429,7 +429,7 @@ report, then please create a GitHub issue.
 ## Author
 
 Marty Kandes, Ph.D.  
-Computational & Data Science Research Specialist  
+Senior Computational & Data Science Research Specialist
 High-Performance Computing User Services Group
 Data-Enabled Scientific Computing Division
 San Diego Supercomputer Center  
@@ -437,8 +437,8 @@ University of California, San Diego
 
 ## Version
 
-0.7.6
+0.7.9
 
 ## Last Updated
 
-Monday, May 6th, 2024
+Wednesday, March 12th, 2025
