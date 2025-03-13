@@ -434,8 +434,47 @@ function galyleo_launch() {
       done
     fi
 
-    # Check if the conda environment specified by the user, if any, can be
-    # initialized and activated successfully. If not, then halt the launch.
+    # Check if Singularity is available within the software environment
+    # specified by the user. If it is not available, then halt the launch.
+    if [[ -n "${singularity_image_file}" ]]; then
+      singularity --version > /dev/null
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m "No singularity executable was found within the software environment."
+        return 1
+      fi
+    fi
+
+    # Check if the user specified a URI to a container stored in a
+    # registry, or a path to a Singularity container already stored on
+    # a local filesystem. If the user specified a path to the container
+    # and the file does not exist, then halt the launch. Note: We cannot
+    # currently check if the URI is valid prior to job launch.
+    if [[ -n "${singularity_image_file}" ]]; then
+      grep -E '^docker://|^library://|^oras://' <<< "${singularity_image_file}"
+      if [[ "${?}" -eq 0 ]]; then
+        slog output -m "Detected URI for container image: ${singularity_image_file}"
+      else
+        if [[ ! -f "${singularity_image_file}" ]]; then
+          slog error -m "Singularity image file does not exist: ${singularity_image_file}"
+          return 1
+        fi
+      fi
+    fi
+
+    # Check if jupyter is already installed within the container
+    # specified by the user. If it is not already installed, then halt
+    # the launch.
+    if [[ -f "${singularity_image_file}" ]]; then
+      timeout "${checklist_timeout}" singularity exec "${singularity_image_file}" jupyter "${jupyter_interface}" --version > /dev/null
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m "Either no jupyter executable was found within the singularity container OR the process used to check for the jupyter executable within the container may have hung and then timed out."
+        return 1
+      fi
+    fi
+
+    # Check if the conda environment specified by the user can be
+    # initialized and activated successfully. If it can be, then check
+    # if jupyter is already installed. If not, then halt the launch.
     if [[ -n "${conda_env}" ]] && [[ -z "${conda_yml}" ]]; then
       if [[ -n "${conda_init}" ]]; then
         source "${conda_init}"
@@ -447,52 +486,19 @@ function galyleo_launch() {
         slog error -m "conda environment could not be activated: ${conda_env}"
         return 1
       fi
+      jupyter "${jupyter_interface}" --version > /dev/null
+      if [[ "${?}" -ne 0 ]]; then
+        slog error -m "No jupyter executable was found within the conda  environment: ${conda_env}"
+        return 1
+      fi
     elif [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
       if [[ ! -f "${conda_yml}" ]]; then
-        slog error -m "conda environment yaml file not found: ${conda_yml}"
+        slog error -m "conda environment.yml file not found: ${conda_yml}"
         return 1
       fi
     elif [[ -n "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
       slog error -m "--conda-env and --conda-yml options should no longer be used together."
       return 1
-    fi
-
-    # Check if the Singularity container image file specified by the user,
-    # if any, exists. If it does not exist, then halt the launch.
-    if [[ -n "${singularity_image_file}" ]]; then
-      if [[ ! -f "${singularity_image_file}" ]]; then
-        slog error -m "Singularity image file does not exist: ${singularity_image_file}"
-        return 1
-      fi
-    fi
-
-    # Check if Jupyter is available within the software environment
-    # defined by the user. If a Singularity container is required, then
-    # also check if the singularity executable is available within the
-    # environment defined by the user prior to checking for Jupyter.
-    # Otherwise, halt the launch.
-    if [[ -n "${singularity_image_file}" ]]; then
-      singularity --version > /dev/null
-      if [[ "${?}" -ne 0 ]]; then
-        slog error -m "No singularity executable was found within the software environment."
-        return 1
-      else
-        timeout "${checklist_timeout}" singularity exec "${singularity_image_file}" jupyter "${jupyter_interface}" --version > /dev/null
-        if [[ "${?}" -ne 0 ]]; then
-          slog error -m "Either no jupyter executable was found within the singularity container OR the process used to check for the jupyter executable within the container may have hung and then timed out."
-          return 1
-        fi
-      fi
-    else
-      if [[ -z "${conda_yml}" ]]; then
-        jupyter "${jupyter_interface}" --version > /dev/null
-        if [[ "${?}" -ne 0 ]]; then
-          slog error -m "No jupyter executable was found within the software environment."
-          return 1
-        fi
-      else
-        slog warning -m "Using a packaged conda environment; cannot check if Jupyter is available prior to launch."
-      fi
     fi
 
   fi
@@ -667,25 +673,18 @@ function galyleo_launch() {
     # Configure and startup a standalone Spark cluster.
     if [[ -n "${spark_home}" ]]; then
       slog append -f "${job_name}.sh" -m "export SPARK_HOME=${spark_home}"
-     
       slog append -f "${job_name}.sh" -m 'export SPARK_MASTER_HOST="$(hostname -s).${GALYLEO_DNS_DOMAIN}"'
       slog append -f "${job_name}.sh" -m 'export SPARK_MASTER_PORT=7777'
-
       slog append -f "${job_name}.sh" -m "export SPARK_DAEMON_MEMORY='8g'"
-
       slog append -f "${job_name}.sh" -m "export SPARK_WORKER_CORES=${cpus_per_task}"
       slog append -f "${job_name}.sh" -m "export SPARK_WORKER_MEMORY=${memory_per_node}g"
-
       slog append -f "${job_name}.sh" -m 'export SPARK_CACHE_DIR="${HOME}/.spark/${SLURM_JOB_ID}"'
       slog append -f "${job_name}.sh" -m 'export SPARK_CONF_DIR="${SPARK_CACHE_DIR}/conf"'
       slog append -f "${job_name}.sh" -m 'export SPARK_LOG_DIR="${SPARK_CACHE_DIR}/logs"'
       slog append -f "${job_name}.sh" -m 'export SPARK_WORKER_DIR="${SPARK_CACHE_DIR}/work"'
-
       slog append -f "${job_name}.sh" -m 'export SPARK_LOCAL_DIRS="${LOCAL_SCRATCH_DIR}"'
-
       slog append -f "${job_name}.sh" -m 'export PATH="${SPARK_HOME}/bin:${PATH}"'
       slog append -f "${job_name}.sh" -m 'export PATH="${SPARK_HOME}/sbin:${PATH}"'
-
       slog append -f "${job_name}.sh" -m 'export PYSPARK_PYTHON="$(which python)"'
       slog append -f "${job_name}.sh" -m 'export PYTHONPATH=$(ZIPS=("$SPARK_HOME"/python/lib/*.zip); IFS=:; echo "${ZIPS[*]}"):$PYTHONPATH'
 
@@ -725,8 +724,8 @@ function galyleo_launch() {
       #slog append -f "${job_name}.sh" -m 'done'
 
       #slog append -f "${job_name}.sh" -m "srun --nodes=\${SLURM_NNODES} --ntasks=\${SLURM_NNODES} --ntasks-per-node=1 start-worker.sh spark://\${SPARK_MASTER_HOST}:\${SPARK_MASTER_PORT} --host "
+      slog append -f "${job_name}.sh" -m ''
     fi
-    slog append -f "${job_name}.sh" -m ''
 
     # Change job working directory (from GALYLEO_CACHE_DIR) to jupyter_notebook_dir.
     slog append -f "${job_name}.sh" -m "cd ${jupyter_notebook_dir}"
@@ -747,6 +746,10 @@ function galyleo_launch() {
     # Structure the singularity exec command and its command-line
     # options specified by the user.
     if [[ -n "${singularity_image_file}" ]]; then
+      grep -E '^docker://|^library://|^oras://' <<< "${singularity_image_file}"
+      if [[ "${?}" -eq 0 ]]; then
+        slog append -f "${job_name}.sh" -m "singularity pull ${singularity_image_file}"
+      fi
       slog append -f "${job_name}.sh" -m 'singularity exec \'
       if [[ -n "${singularity_bind_mounts}" ]]; then
         slog append -f "${job_name}.sh" -m "  --bind ${singularity_bind_mounts} \\"
