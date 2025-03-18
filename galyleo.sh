@@ -26,7 +26,7 @@
 # AUTHOR(S)
 #
 #     Marty Kandes, Ph.D.
-#     Computational & Data Science Research Specialist
+#     Senior Computational & Data Science Research Specialist
 #     High-Performance Computing User Services Group
 #     Data-Enabled Scientific Computing Division
 #     San Diego Supercomputer Center
@@ -34,7 +34,7 @@
 #
 # LAST UPDATED
 #
-#     Wednesday, March 12th, 2025
+#     Monday, March 17th, 2025
 #
 # ----------------------------------------------------------------------
 
@@ -593,6 +593,18 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m 'declare -i random_ephemeral_port=-1'
     slog append -f "${job_name}.sh" -m ''
 
+    # Choose an open ephemeral port at random.
+    slog append -f "${job_name}.sh" -m 'while (( "${JUPYTER_PORT}" < 0 )); do'
+    slog append -f "${job_name}.sh" -m '  while (( "${random_ephemeral_port}" < "${LOWEST_EPHEMERAL_PORT}" )); do'
+    slog append -f "${job_name}.sh" -m '    random_ephemeral_port="$(od -An -N 2 -t u2 -v < /dev/urandom)"'
+    slog append -f "${job_name}.sh" -m '  done'
+    slog append -f "${job_name}.sh" -m '  ss -nutlp | cut -d : -f2 | grep "^${random_ephemeral_port})" > /dev/null'
+    slog append -f "${job_name}.sh" -m '  if [[ "${?}" -ne 0 ]]; then'
+    slog append -f "${job_name}.sh" -m '    JUPYTER_PORT="${random_ephemeral_port}"'
+    slog append -f "${job_name}.sh" -m '  fi'
+    slog append -f "${job_name}.sh" -m 'done'
+    slog append -f "${job_name}.sh" -m ''
+
     # Reset module environment to default set.
     slog append -f "${job_name}.sh" -m 'module reset'
 
@@ -613,7 +625,7 @@ function galyleo_launch() {
     fi
 
     # Activate a pre-installed conda environment specified by the user.
-    if [[ -n "${conda_env}" ]] && [[ -z "${conda_yml}" ]]; then
+    if [[ -n "${conda_env}" ]] && [[ -z "${conda_yml}" ]] && [[ -z "${singularity_image_file}" ]]; then
       if [[ -n "${conda_init}" ]]; then
         slog append -f "${job_name}.sh" -m "source ${conda_init}"
       else
@@ -623,14 +635,14 @@ function galyleo_launch() {
     fi
 
     # Create and/or activate a dynamically generated conda environment specified by the user.
-    if [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]]; then
+    if [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]] && [[ -z "${singularity_image_file}" ]]; then
       conda_env="$(grep name: ${OLDPWD}/${conda_yml} | awk '{print $2}')"
       if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
         mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
       fi
       cp "${OLDPWD}/${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml}"
       cd "${GALYLEO_CACHE_DIR}/${conda_env}"
-      md5sum -c "${conda_env}.md5"
+      md5sum -c "${conda_env}.md5" > /dev/null
       if [[ "${?}" -eq 0 ]]; then # unpack existing conda environment
         cd "${GALYLEO_CACHE_DIR}"
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
@@ -658,7 +670,7 @@ function galyleo_launch() {
           slog append -f "${job_name}.sh" -m "conda env create --file ${conda_yml}"
         fi
         if [[ "${conda_cache}" == 'true' ]]; then
-          slog append -f "${job_name}.sh" -m 'conda install -y conda-pack'
+          slog append -f "${job_name}.sh" -m 'conda install -y conda-pack -c conda-forge'
           slog append -f "${job_name}.sh" -m "conda pack -n ${conda_env} -o ${conda_env}.tar.gz"
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.tar.gz ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz"
           slog append -f "${job_name}.sh" -m "md5sum ${conda_yml} > ${conda_env}.md5"
@@ -731,25 +743,86 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m "cd ${jupyter_notebook_dir}"
     slog append -f "${job_name}.sh" -m ''
 
-    # Choose an open ephemeral port at random.
-    slog append -f "${job_name}.sh" -m 'while (( "${JUPYTER_PORT}" < 0 )); do'
-    slog append -f "${job_name}.sh" -m '  while (( "${random_ephemeral_port}" < "${LOWEST_EPHEMERAL_PORT}" )); do'
-    slog append -f "${job_name}.sh" -m '    random_ephemeral_port="$(od -An -N 2 -t u2 -v < /dev/urandom)"'
-    slog append -f "${job_name}.sh" -m '  done'
-    slog append -f "${job_name}.sh" -m '  ss -nutlp | cut -d : -f2 | grep "^${random_ephemeral_port})" > /dev/null'
-    slog append -f "${job_name}.sh" -m '  if [[ "${?}" -ne 0 ]]; then'
-    slog append -f "${job_name}.sh" -m '    JUPYTER_PORT="${random_ephemeral_port}"'
-    slog append -f "${job_name}.sh" -m '  fi'
-    slog append -f "${job_name}.sh" -m 'done'
-    slog append -f "${job_name}.sh" -m ''
-
-    # Structure the singularity exec command and its command-line
-    # options specified by the user.
+    # Locally cache a container stored in a remote container registry
     if [[ -n "${singularity_image_file}" ]]; then
-      grep -E '^docker://|^library://|^oras://' <<< "${singularity_image_file}"
+      grep -E '^docker://|^library://|^oras://' <<< "${singularity_image_file}" > /dev/null
       if [[ "${?}" -eq 0 ]]; then
-        slog append -f "${job_name}.sh" -m "singularity pull ${singularity_image_file}"
+        slog append -f "${job_name}.sh" -m "singularity exec ${singularity_image_file} cat /etc/os-release"
       fi
+    fi
+
+    # Create and/or activate a dynamically generated conda environment
+    # within a container specified by the user.
+    if [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]] && [[ -n "${singularity_image_file}" ]]; then
+      conda_env="$(grep name: ${OLDPWD}/${conda_yml} | awk '{print $2}')"
+      if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
+        mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
+      fi
+      cp "${OLDPWD}/${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml}"
+      cd "${GALYLEO_CACHE_DIR}/${conda_env}"
+      md5sum -c "${conda_env}.md5" > /dev/null
+      if [[ "${?}" -ne 0 ]]; then # re/build (and cache) the conda environment within container
+        cd "${GALYLEO_CACHE_DIR}"
+        slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniconda3"'
+        slog append -f "${job_name}.sh" -m 'export CONDA_ENVS_PATH="${CONDA_INSTALL_PATH}/envs"'
+        slog append -f "${job_name}.sh" -m 'export CONDA_PKGS_DIRS="${CONDA_INSTALL_PATH}/pkgs"'
+        slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
+        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml} ./"
+        slog append -f "${job_name}.sh" -m "wget https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}-Linux-x86_64.sh"
+        slog append -f "${job_name}.sh" -m "chmod +x Miniconda3-${conda_version}-Linux-x86_64.sh"
+        slog append -f "${job_name}.sh" -m 'singularity instance start --bind ${LOCAL_SCRATCH_DIR} \'
+        if [[ -n "${singularity_gpu_type}" ]]; then
+          slog append -f "${job_name}.sh" -m "  --${singularity_gpu_type} \\"
+        fi
+        slog append -f "${job_name}.sh" -m "  ${singularity_image_file} ${job_name}"
+        slog append -f "${job_name}.sh" -m "singularity exec instance://${job_name} ./Miniconda3-${conda_version}-Linux-x86_64.sh -b -p \"\${CONDA_INSTALL_PATH}\""
+
+        slog append -f 'setup-conda.sh' -m '#!/usr/bin/env bash'
+        slog append -f 'setup-conda.sh' -m ''
+        slog append -f 'setup-conda.sh' -m 'source "${CONDA_INSTALL_PATH}/etc/profile.d/conda.sh"'
+        slog append -f 'setup-conda.sh' -m 'conda activate base'
+        if [[ "${conda_mamba}" == 'true' ]]; then
+          slog append -f 'setup-conda.sh' -m 'conda install -y mamba -n base -c conda-forge'
+          slog append -f 'setup-conda.sh' -m "mamba env create -y -f ${conda_yml}"
+        else
+          slog append -f 'setup-conda.sh' -m "conda env create -y -f ${conda_yml}"
+        fi
+        if [[ "${conda_cache}" == 'true' ]]; then
+          slog append -f 'setup-conda.sh' -m 'conda install -y conda-pack -c conda-forge'
+          slog append -f 'setup-conda.sh' -m "conda pack -n ${conda_env} -o ${conda_env}.tar.gz"
+          slog append -f 'setup-conda.sh' -m "cp ${conda_env}.tar.gz ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz"
+          slog append -f 'setup-conda.sh' -m "md5sum ${conda_yml} > ${conda_env}.md5"
+          slog append -f 'setup-conda.sh' -m "cp ${conda_env}.md5 ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.md5"
+        fi
+        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/setup-conda.sh ./"
+        slog append -f "${job_name}.sh" -m "chmod +x setup-conda.sh"
+        slog append -f "${job_name}.sh" -m "singularity exec instance://${job_name} ./setup-conda.sh"
+      else # unpack existing conda environment within container
+        slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
+        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz ./"
+        slog append -f "${job_name}.sh" -m "mkdir -p ${conda_env}"
+        slog append -f "${job_name}.sh" -m "tar -xf ${conda_env}.tar.gz -C ${conda_env}"
+        slog append -f "${job_name}.sh" -m 'singularity instance start --bind ${LOCAL_SCRATCH_DIR} \'
+        if [[ -n "${singularity_gpu_type}" ]]; then
+          slog append -f "${job_name}.sh" -m "  --${singularity_gpu_type} \\"
+        fi
+        slog append -f "${job_name}.sh" -m "  ${singularity_image_file} ${job_name}"
+        slog append -f "${job_name}.sh" -m "singularity exec instance://${job_name} bash -c 'source ${conda_env}/bin/activate; conda-unpack'"
+      fi
+    fi
+
+    if [[ -n "${conda_env}" ]] && [[ -n "${conda_yml}" ]] && [[ -n "${singularity_image_file}" ]]; then
+      slog append -f "${job_name}.sh" -m "singularity exec instance://${job_name} pwd"
+      slog append -f "${job_name}.sh" -m "singularity exec instance://${job_name} bash -c 'source \"\${CONDA_INSTALL_PATH}/etc/profile.d/conda.sh\"; conda activate ${conda_env}; jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${GALYLEO_DNS_DOMAIN}\" --notebook-dir=${jupyter_notebook_dir} --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin=* --KernelManager.transport=ipc --no-browser;'"
+      slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
+      slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
+      slog append -f "${job_name}.sh" -m '  exit 1'
+      slog append -f "${job_name}.sh" -m 'fi'
+    fi
+
+    # Run singularity exec command and its command-line options
+    # specified by the user.
+    if [[ -z "${conda_env}" ]] && [[ -z "${conda_yml}" ]] && [[ -n "${singularity_image_file}" ]]; then
       slog append -f "${job_name}.sh" -m 'singularity exec \'
       if [[ -n "${singularity_bind_mounts}" ]]; then
         slog append -f "${job_name}.sh" -m "  --bind ${singularity_bind_mounts} \\"
@@ -760,6 +833,7 @@ function galyleo_launch() {
       slog append -f "${job_name}.sh" -m "  ${singularity_image_file} \\"
     fi
 
+    # Run the Jupyter (or Voila) server process in the backgroud.
     if [[ "${jupyter_interface}" == 'voila' ]]; then
       slog append -f "${job_name}.sh" -m "voila --Voila.ip=\"\$(hostname -s).${GALYLEO_DNS_DOMAIN}\" --port=\"\${JUPYTER_PORT}\" --Voila.tornado_settings=allow_origin='*' --no-browser &"
       slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
@@ -768,7 +842,6 @@ function galyleo_launch() {
       slog append -f "${job_name}.sh" -m 'fi'
       slog append -f "${job_name}.sh" -m ''
     else
-      # Run the Jupyter server process in the backgroud.
       slog append -f "${job_name}.sh" -m "jupyter ${jupyter_interface} --ip=\"\$(hostname -s).${GALYLEO_DNS_DOMAIN}\" --notebook-dir='${jupyter_notebook_dir}' --port=\"\${JUPYTER_PORT}\" --NotebookApp.allow_origin='*' --KernelManager.transport='ipc' --no-browser &"
       slog append -f "${job_name}.sh" -m 'if [[ "${?}" -ne 0 ]]; then'
       slog append -f "${job_name}.sh" -m "  echo 'ERROR: Failed to launch Jupyter.'"
