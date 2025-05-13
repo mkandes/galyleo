@@ -1,23 +1,23 @@
 # galyleo
 
-`galyleo` is a shell utility to help you launch 
-[Jupyter](https://jupyter.org) notebooks on high-performance computing 
-(HPC) systems in a simple, secure way. It works with SDSC's [Satellite 
-reverse proxy service](https://github.com/sdsc-hpc-training-org/satellite)
-and a batch job scheduler like [Slurm](https://slurm.schedmd.com) to
-provide each Jupyter notebook server you start with its own one-time,
-token-authenticated HTTPS connection between the compute resources of 
-the HPC system the notebook server is running on and your web browser. 
-This secure connection affords both privacy and integrity to the data 
+`galyleo` is a command-line shell utility to help you launch
+[Jupyter](https://jupyter.org) notebooks on high-performance computing
+(HPC) systems in a simple, secure way. It works in conjunction with the
+[Satellite Reverse Proxy Service](https://github.com/sdsc-hpc-training-org/satellite)
+and the [Slurm Workload Manager](https://slurm.schedmd.com) to provide
+each Jupyter notebook server you start with its own one-time, 
+token-authenticated HTTPS connection between the compute resources of
+the HPC system the notebook server is running on and your web browser.
+This secure connection affords both privacy and integrity to the data
 exchanged between the notebook server and your browser, helping protect
 you and your work against network eavesdropping and data tampering. 
 
-- [Quick Start Guide](#quickstart)
+- [Quick Start User Guide](#quickstart)
 - [Command-line options](#command-line)
 - [Defining your software environment](#softwareenv)
+  - [Conda environments](#conda)
   - [Environment modules](#envmodules)
   - [Singularity containers](#singularity)
-  - [Conda environments](#conda)
 - [Debugging your session](#debug)
 - [Additional Information](#additionalinfo)
 
@@ -25,371 +25,259 @@ you and your work against network eavesdropping and data tampering.
 
 ## Quick Start Guide
 
-`galyleo` is currently deployed on the following HPC systems at SDSC:
+`galyleo` is currently deployed on the following HPC systems at the San
+Diego Supercomputer Center (SDSC):
 
-- [Expanse](https://expanse.sdsc.edu)
-- [Triton Shared Compute Cluster (TSCC)](https://www.sdsc.edu/support/user_guides/tscc.html)
+- [Expanse](https://www.sdsc.edu/systems/expanse/index.html)
+- [Triton Shared Compute Cluster (TSCC)](https://www.sdsc.edu/systems/tscc/index.html)
 
 To use `galyleo`, you first need to prepend its install location to your
 `PATH` environment variable. This path is different for each HPC system
 at SDSC. 
 
 On Expanse, use:
+
 ```bash
 export PATH="/cm/shared/apps/sdsc/galyleo:${PATH}"
 ```
 
-On TSCC, there is now a software module available for loading `galyleo` into your environment.
+On TSCC, there is now a software module available to load `galyleo` into
+your environment.
 
-```
-[mkandes@login1 ~]$ module load galyleo/0.7.4 
-[mkandes@login1 ~]$ module list
-
-Currently Loaded Modules:
-  1) shared   2) cpu/0.17.3   3) slurm/tscc/23.02.7   4) sdsc/1.0   5) DefaultModules   6) galyleo/0.7.4
-
-[mkandes@login1 ~]$ which galyleo
-/cm/shared/apps/spack/0.17.3/cpu/opt/spack/linux-rocky9-cascadelake/gcc-11.2.0/galyleo-0.7.4/galyleo
-[mkandes@login1 ~]$ echo $PATH
-/cm/shared/apps/spack/0.17.3/cpu/opt/spack/linux-rocky9-cascadelake/gcc-11.2.0/galyleo-0.7.4:/tscc/nfs/home/mkandes/.local/bin:/tscc/nfs/home/mkandes/bin:/cm/shared/apps/sdsc/1.0/bin:/cm/shared/apps/sdsc/1.0/sbin:/cm/shared/apps/slurm/current/sbin:/cm/shared/apps/slurm/current/bin:/cm/shared/apps/spack/0.17.3/cpu/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
-[mkandes@login1 ~]$
+```bash
+module load galyleo/0.7.4 
 ```
 
-Once `galyleo` is in your `PATH`, you can then use its `launch` command
-to create a secure Jupyter notebook session. A number of command-line 
+Once `galyleo` is in your `PATH`, you can use its `launch` command to
+create a secure Jupyter notebook session. A number of command-line 
 options will allow you to configure:
 
 - the compute resources required to run your Jupyter notebook session;
-- the type of Jupyter interface you want to use for the session and the
-location of the notebook working directory; and
-- the software environment that contains the `jupyter` notebook server 
-and the other software packages you want to work with during the session.
+- the type of Jupyter interface you want to use for the session and the location of the notebook working directory; and
+- the software environment that contains the `jupyter` notebook server and the other software packages you want to work with during the session.
 
-For example, the following `launch` command will create a 30-minute 
-JupyterLab session on two CPU-cores with 4 GB of memory on one of
-Expanse's `shared` AMD compute nodes using the base `anaconda3` 
-distribution available in its default `cpu` software module environment.
+For example, as shown below, you can use the `launch` command to request
+a `30`-minute JupyterLab session with `2` CPU cores and `4` GB of memory
+on one of Expanse's AMD compute nodes in the `debug` partition using the 
+version of JupyterLab available in its `cpu/0.17.3b` software module 
+environment.
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules cpu/0.17.3b,anaconda3/2021.05
+galyleo launch --account abc123 --partition debug --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules cpu/0.17.3b,gcc/10.2.0,py-jupyterlab/3.2.1
 ```
 
 When the `launch` command completes successfully, you will be issued a 
-unique HTTPS URL generated for your secure Jupyter notebook session. 
+unique HTTPS URL for your secure Jupyter notebook session. 
 
 ```bash
 https://wages-astonish-recapture.expanse-user-content.sdsc.edu?token=1abe04ac1703ca623e4e907cc37678ae
 ```
 
-Copy and paste this HTTPS URL into your web browser. Your Jupyter 
-notebook session will begin once the requested compute resources are
-allocated to your job by the scheduler.
+Copy and paste this URL into your web browser. Your Jupyter notebook
+session will begin once the requested compute resources are available 
+and allocated by the Slurm scheduler. 
 
 <div id='command-line'/>
 
 ## Command-line options
 
-A list of the most commonly used command-line options for the `launch`
-command are described below. 
+The most commonly used command-line options for the `launch` command are
+listed and described below.
 
 Scheduler options:
 
-- `-A, --account`: charge the compute resources required by this job to 
-the specified account or allocation project id
-- `-p, --partition`: select the resource partition or queue the 
-job should be submitted to
+- `-A, --account`: charge the compute resources required by this job to the specified account
+- `-p, --partition`: select the resource partition (or queue) the job should be submitted to
 - `-c, --cpus`: number of cpus to request for the job
 - `-m, --memory`: amount of memory (in GB) required for the job
 - `-g, --gpus`: number of GPUs required for the job
 - `-t, --time-limit`: set a maximum runtime (in HH:MM:SS) for the job
-- `-C, --constraint`: apply a feature constraint to specify the type of
-compute node required for the job
 
 Jupyter options:
-- `-i, --interface`: select the user interface for the Jupyter notebook 
-  session; the only options are *lab* or *notebook* or *voila*
-- `-d, --notebook-dir`: path to the working directory where the Jupyter 
-  notebook session will start; default value is your `$HOME` directory
+
+- `-i, --interface`: select the user interface for the Jupyter notebook session; the only options are *lab* or *notebook* or *voila*
+- `-d, --notebook-dir`: path to the working directory where the Jupyter notebook session will start; default value is your `$HOME` directory
 
 Software environment options:
-- `-e, --env-modules`: comma-separated list of environment modules
-  that will be loaded to create the software environment for the Jupyter
-  notebook session
-- `-s, --sif`: path to a Singularity container image file that will be
-  run to create the software environment for the Jupyter notebook session
-- `-B, --bind`: comma-separated list of user-defined bind paths to be
-  mounted within a Singularity container
+
+- `--conda-env`: name of a conda environment to activate
+- `--conda-yml`: path to a conda `environment.yml` file
+- `--mamba`: use mamba instead of miniconda
+- `--cache`: cache your conda environment using conda-pack; a cached environment will be unpacked and reused if and only if the `environment.yml` file does not change
+
+- `-e, --env-modules`: comma-separated list of environment modules to load
+
+- `-s, --sif`: URI to a container stored in a registry, or path to a Singularity container image already stored on a local filesystem
+- `-B, --bind`: comma-separated list of user-defined bind paths to be mounted within a Singularity container
 - `--nv`: enable NVIDIA GPU support when running a Singularity container
-- `--conda-env`: name of a conda environment to activate to create the 
-  software environment for the Jupyter notebook session
-- `--conda-yml`: path to an `environment.yml` file
-- `--mamba`: use mamba instead of miniconda to create your conda
-  environment from an `environment.yml` file.
-- `--cache`: cache your conda environment created from an 
-  `environment.yml` file using conda-pack; a cached environment will be
-  unpacked and reused if the `environment.yml` file does not change
 
 <div id='softwareenv'/>
 
 ## Defining your software environment
 
-After you specify the compute resources required for your Jupyter 
+After you specify the compute resources required for your Jupyter
 notebook session using the *Scheduler options* outlined above, the 
 next most important set of command-line options for the `launch` command
 are those that help you define the software environment. Listed in the 
 *Software environment options* section above, these command-line options
-are discussed in detail in the next few subsections below. 
-
-<div id='envmodules'/>
-
-### Environment modules
-
-Most HPC systems use a software module system like 
-[Lmod](https://lmod.readthedocs.io) or 
-[Environment Modules](http://modules.sourceforge.net) to provide you
-with a convenient way to dynamically load pre-installed software 
-applications, libraries, and other packages into your shell's 
-environment. 
-
-If you need to `module load` any software to create the environment for
-your Jupyter notebook session, you can do so by including them as a 
-comma-separated list to the `--env-modules` option in your `launch` 
-command. Each module included in the list will be loaded prior to 
-starting `jupyter`. In some cases, the `--env-modules` command-line 
-option may be the only one you need to define your software environment. 
-For example, if you have a standard Python-based data science workflow 
-that you want run on Expanse, then you might only need to load one of 
-the [Anaconda](https://www.anaconda.com) distributions available in its
-software module environment.
-
-```bash
-galyleo launch --account abc123 --partition shared --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules cpu/0.17.3b,anaconda3/2021.05
-```
-
-By default, each Anaconda distribution comes with over 250 of the most 
-popular data science software packages pre-installed, including `jupyter`.
-
-<div id='singularity'/>
-
-### Singularity containers
-
-[Singularity](https://sylabs.io/guides/latest/user-guide) containers
-bring operating system-level virtualization to scientific and 
-high-performance computing, allowing you to package complete software 
-environments --- including operating systems, software applications, 
-libraries, and data --- in a simple, portable, and reproducible way, 
-which can then be executed and run almost anywhere.
-
-If you have a Singularity container that you would like to run your 
-Jupyter notebook session within, then you simply need to provide a path
-to the container with the `--sif` option in your `launch` command. This
-will start `jupyter` within the container using the `singularity exec` 
-command. If necessary, you can also pass user-defined `--bind` mounts to 
-the container and enable NVIDIA GPU support via the `--nv` flag.
-
-One of the most powerful features of Singularity is its ability to 
-convert an existing Docker container to a Singularity container. So, 
-even if you are not familiar with how to build your own Singularity
-container, you can always search public container registries like 
-[Docker Hub](https://hub.docker.com) for an existing container that may
-help you get your work done. 
-
-For example, let's say you need an [R](https://www.r-project.org) 
-environment for your Jupyter notebook session. Why not try the latest 
-[r-notebook container](https://hub.docker.com/r/jupyter/r-notebook) 
-from the [Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io) 
-project? To get started, you first use the `singularity pull` command to 
-download and convert the Docker container to a Singularity container.
-
-```bash
-singularity pull docker://jupyter/r-notebook:latest
-```
-
-Once all of the layers of the Docker container have been downloaded and
-the container conversion process is complete, you can then `launch` your
-Jupyter notebook session with the newly built Singularity container.
-
-```bash
-galyleo launch --account abc123 --cpus 2 --memory 4 --time-limit 00:30:00 --sif r-notebook_latest.sif
-```
-
-On some systems like Expanse, you may need to load Singularity via the 
-software module environment as well.
-
-```bash
-galyleo launch --account abc123 --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules singularitypro --sif r-notebook_latest.sif --bind /expanse,/scratch
-```
-
-Here, the user-defined `--bind` mount option also enables access to both
-the `/expanse` network filesystems (e.g., `/expanse/lustre`) and the 
-local NVMe `/scratch` disk(s) available on each compute node from within
-the container. By default, only your `$HOME` directory is accessible from 
-within the container.
-
-Singularity also provides native support for running containerized 
-applications on NVIDIA GPUs. If you have a GPU-accelerated application
-you would like to run during your Jupyter notebook session, please make
-sure your container includes a CUDA-enabled version of the application 
-that can utilize NVIDIA GPUs. 
-
-NVIDIA distributes a number of GPU-optimized containers via their 
-[container registry](https://catalog.ngc.nvidia.com). This includes 
-containers for all of the most popular deep learning frameworks --- 
-[PyTorch](https://pytorch.org), [TensorFlow](https://www.tensorflow.org), 
-and [MXNet](https://mxnet.apache.org) --- with `jupyter` pre-installed.
-Like the the containers available from DockerHub, you can `pull` these 
-containers to the HPC system you are working on
-
-```bash
-singularity pull docker://nvcr.io/nvidia/pytorch:21.07-py3
-```
-
-and then `launch` your Jupyter notebook session with `galyleo`. For 
-example, you might want to run this PyTorch container on a single 
-NVIDIA V100 GPU available in Expanse's `gpu-shared` partition.
-
-```bash
-galyleo launch --account abc123 --partition gpu-shared --cpus 10 --memory 93 --gpus 1 --time-limit 00:30:00 --env-modules singularitypro --sif pytorch_21.07-py3.sif --bind /expanse,/scratch --nv 
-```
-
-Note, however, how you request GPU resources with `galyleo` may be 
-different from one HPC system to another. For example, on Comet you must
-use the `--gres` command-line option on Comet to specify both the type 
-and number of GPUs required for your Jupyter notebook session. The 
-following `launch` command would create a session within the NVIDIA 
-PyTorch container on a single P100 GPU available in Comet's `gpu-shared` 
-partition.
-
-```bash
-galyleo launch --account abc123 --partition gpu-shared --cpus 7 --gres gpu:p100:1 --time-limit 00:30:00 --sif pytorch_21.07-py3.sif --bind /oasis,/scratch --nv
-```
-
-In contrast, on TSCC you'll never explicitly request a specific number 
-of GPUs for your Jupyter notebook session. All GPUs on TSCC are currently
-allocated implicitly in proportion to the number of CPU-cores requested
-by a job and available on the type of GPU-accelerated compute node you 
-expect it to run on. And if you would like to request your notebook 
-session be scheduled on a certain type of GPU, then you must pass the 
-type of GPU required listed in the `pbsnodes` properties via the 
-`--constraint` command-line option. For example, the following `launch` 
-command will schedule your session on one of the NVIDIA GeForce RTX ]
-2080Ti GPUs available in the `gpu-hotel` queue on TSCC.
-
-```bash
-galyleo launch --account abc123 --partition gpu-hotel --cpus 2 --constraint gpu2080ti --time-limit 00:30:00 --sif pytorch_21.07-py3.sif --bind /oasis --nv
-```
-
-Whatever you do, whenever you're launching your Jupyter notebook session 
-with `galyleo` from a Singularity container on compute resources with 
-NVIDIA GPUs, don't forget the include the `--nv` flag.
+are discussed in more detail in the next few subsections below.
 
 <div id='conda'/>
 
 ### Conda environments
 
-[Conda](https://docs.conda.io) is an open-source software package and 
-environment manager developed by [Anaconda Inc.](https://www.anaconda.com). 
-Its ease of use, compatibility across multiple operating systems, and 
+[Conda](https://docs.conda.io) is an open-source software package and
+environment manager developed by [Anaconda Inc.](https://www.anaconda.com).
+Its ease of use, compatibility across multiple operating systems, and
 comprehensive support for both the Python and R software ecosystems has
-made it one of the most popular ways to build and maintain custom 
-software environments in the data science and machine learning 
-communities. And because of the constantly evolving software landscape 
+made it one of the most popular ways to build and maintain custom
+software environments in the data science and machine learning
+communities. And because of the constantly evolving software landscape
 in these spaces, which can involve quite complex software dependencies,
 conda is often the simplest way to get your custom Python or R software
 environment up and running on an HPC system.
 
-`galyleo` supports the use of conda environments to configure the 
-software environment for your Jupyter notebook session. If you've 
-already installed a conda distribution --- we recommend [Miniconda](
-https://docs.conda.io/en/latest/miniconda.html) --- 
-and configured a custom conda environment within it, then you should 
-only need to specify the name of the conda environment you want to 
-activate for your notebook session with the `--conda-env` command-line 
-option. 
+`galyleo` supports the use of conda to configure the software environment 
+for your Jupyter notebook sessions. In general, we recommend the use of 
+[`environment.yml`](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file) 
+files, which `galyleo` can use to dynamically generate and serve your 
+conda environments when your session starts. For example, let's consider
+the following `environment.yml` file.
 
-For example, let's imagine you've already created a custom conda 
-environment from the following [`environment.yml`](
-https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file)
-file.
 ```yaml
 name: notebooks-sharing
 
 channels:
   - conda-forge
-  - anaconda
 
 dependencies:
-  - python=3.7
-  - jupyterlab=3
-  - pandas=1.2.4
-  - matplotlib=3.4.2
-  - seaborn=0.11.0
-  - scikit-learn=0.23.2
-``` 
-
-You should then be able to `launch` a 30-minute JupyterLab session on a
-four CPU-cores with 8 GB of memory on one of Expanse's `shared` AMD 
-compute nodes by simply activating the `notebooks-sharing` environment.
-
-```bash
-galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing
-```
-Note, however, the use of the `--conda-env` command-line option here
-assumes you've already configured your `~/.bashrc` file with the `conda
-init` command. If you have not done so (or choose not to do so), then
-you can also initialize any conda distribution in your `launch` command 
-by providing the path to its `conda.sh` initialization script in the 
-`etc/profile.d` directory via the `--conda-init` command-line option.
-
-```bash
-galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-init miniconda3/etc/profile.d/conda.sh
+  - python
+  - jupyterlab
+  - pandas
+  - matplotlib
+  - seaborn
+  - scikit-learn
 ```
 
-While creating your own custom software environment with conda may be 
-convenient, it can also generate a high metadata load on the types of 
-shared network filesystems you'll often find on an HPC system. At a 
-minimum, if you install your conda distribution on a network filesystem, 
-you can expect this to increase the installation time of software 
-packages into your conda environment when compared to a local filesystem 
-installation you may have done previously on your laptop. Under some
-circumstances, this metadata issue can lead to a serious degradation of
-the aggregate I/O performance across a filesystem, affecting the 
-performance of all user jobs on the system.
-
-If you have not yet installed your conda environment on a shared 
-filesystem (such as in your `$HOME` directory), `galyleo` now also 
-allows you to dynamically create the environment at runtime from an 
-`environment.yml` file. To use this feature, you simply need to provide
-the name of the `environment.yml` file with the `--conda-yml` 
-command-line option. For example, if you wanted to start an Juoyter 
-notebook session with the `notebooks-sharing` environment, you would use
-the following command:
+If you wanted to start a `30`-minute Jupyter notebook session with access
+to `4` CPU cores and `8` GB of memory on one of Expanse's AMD compute nodes
+in the `debug` partition using the `notebooks-sharing` conda environment,
+then you would use the following `launch` command with the `--conda-yml`
+command-line option followed by the path to the `environment.yml` file.
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml environment.yml
+galyleo launch --account abc123 --partition debug --cpus 4 --memory 8 --time-limit 00:30:00 --conda-yml environment.yml
 ```
 
-You can further improve the installation performance and reuse of these 
-dynamically generated conda environments by using the new `--mamba` and
-`--cache` command-line options, which enables the use of 
-[Mamba](https://mamba.readthedocs.io) to speed up software installs
-and saves the completed conda environment using 
-[conda-pack](https://conda.github.io/conda-pack) for future reuse, 
-respectively. 
+You can further improve the installation performance and reuse of these
+conda environments by appending the `--mamba` and `--cache` flags to
+your `launch` command, which enable the use of [mamba](https://mamba.readthedocs.io) 
+to speed up software installs and saves the environment with
+[conda-pack](https://conda.github.io/conda-pack) for future reuse,
+respectively.
 
 ```bash
-galyleo launch --account abc123 --partition shared --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-yml environment.yml --mamba --cache
+galyleo launch --account abc123 --partition debug --cpus 4 --memory 8 --time-limit 00:30:00 --conda-yml environment.yml --mamba --cache
 ```
-   
+
+Of course, if you've already installed a conda distribution --- such as
+[miniconda](https://www.anaconda.com/docs/getting-started/miniconda) or 
+[miniforge](https://conda-forge.org/download) --- in your `$HOME` directory
+and configured a conda environment, then you can simply activate the 
+environment for your Jupyter notebook session with the `--conda-env` 
+option followed by the name of the environment.
+
+```bash
+galyleo launch --account abc123 --partition debug --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing
+```
+
+Note, however, the `--conda-env` option assumes that your shell `rc`
+file (e.g. `~/.bashrc`) has been configured by the `conda init` command
+for shell interaction. If it is not configured, you can still activate a
+conda environment by providing the path to the `conda.sh` initialization
+script in the `etc/profile.d` directory of your distribution via the 
+`--conda-init` option.
+
+```bash
+galyleo launch --account abc123 --partition debug --cpus 4 --memory 8 --time-limit 00:30:00 --conda-env notebooks-sharing --conda-init ~/miniforge3/etc/profile.d/conda.sh
+```
+
+<div id='envmodules'/>
+
+### Environment modules
+
+Most HPC systems use a software module system like [Lmod](https://lmod.readthedocs.io)
+or [Environment Modules](http://modules.sourceforge.net) to provide you
+with a convenient way to load pre-installed software applications,
+libraries, and other packages into your environment.
+
+If you need to `module load` any software into the environment for
+your Jupyter notebook session, you can include them as a comma-separated
+list to the `--env-modules` option as part of your `launch` command. 
+For example, the following `launch` command requests a `30`-minute 
+JupyterLab session with `2` CPU cores and `4` GB of memory on one of 
+Expanse's AMD compute nodes in the `debug` partition using the version
+of JupyterLab available in its `cpu/0.17.3b` software module environment.
+
+```bash
+galyleo launch --account abc123 --partition debug --cpus 2 --memory 4 --time-limit 00:30:00 --env-modules cpu/0.17.3b,gcc/10.2.0,py-jupyterlab/3.2.1
+```
+
+<div id='singularity'/>
+
+### Singularity containers
+
+[Singularity](https://sylabs.io/guides/latest/user-guide) brings 
+operating system-level virtualization to scientific and high-performance
+computing, allowing you to package complete software environments --- 
+including operating systems, software applications, libraries, and data
+--- in a simple, portable, and reproducible way, which can then be run 
+almost anywhere.
+
+If you have a container that you would like to run your Jupyter notebook
+session from, you can use the `--sif` option in your `launch` command
+followed by either (1) a URI to where the container is stored in a 
+registry (e.g., [Docker Hub](https://hub.docker.com)), or (2) a path to
+where the container image is stored on a local filesystem. In general, 
+we recommend the use of containers served from [common registries](https://docs.sylabs.io/guides/latest/user-guide/singularity_and_docker.html#containers-from-other-registries),
+which will be cached to your local filesystem for reuse by default 
+anyway.
+
+For example, let's say you need an [R](https://www.r-project.org)
+environment for your Jupyter notebook session. Try the latest 
+[r-notebook](https://quay.io/repository/jupyter/r-notebook) container
+from the [Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io)
+project on [Quay.io](https://quay.io).
+
+```bash
+galyleo launch --account abc123 --partition debug --cpus 4 --memory 8 --time-limit 00:30:00 --sif docker://quay.io/jupyter/r-notebook:latest
+```
+
+Or, if you want to work on your latest AI project, then go ahead and 
+`launch` a GPU-accelerated [PyTorch](https://pytorch.org) container from
+the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com) on a V100 GPU 
+available in Expanse's `gpu-debug` partition.
+
+```bash
+galyleo launch --account abc123 --partition gpu-debug --cpus 10 --memory 92 --gpus 1 --time-limit 00:30:00 --sif docker://nvcr.io/nvidia/pytorch:24.12-py3 --bind /expanse,/scratch --nv
+```
+
+Here, the user-defined [`--bind` mount](https://docs.sylabs.io/guides/latest/user-guide/bind_paths_and_mounts.html)
+option enables access to the `/expanse` filesystems (e.g., `/expanse/lustre`)
+and the node-local NVMe `/scratch` disk available on each compute node
+from within the container. By default, only your `$HOME` directory is
+accessible from within the container. The `--nv` flag enables
+[NVIDIA GPU support](https://docs.sylabs.io/guides/latest/user-guide/gpu.html). 
+
 <div id='debug'/>
 
 ## Debugging your session
 
-If you experience a problem launching your Jupyter notebook session with 
-`galyleo`, you may be able to debug the issue yourself by reviewing the
-batch job script generated by `galyleo` or the standard output/error
-file generated by the job itself. You can find these files stored in the 
-hidden `~/.galyleo` directory created in your `HOME` directory.
+If you experience a problem when launching your Jupyter notebook session
+with `galyleo`, you may be able to debug the issue yourself by reviewing
+the batch job script generated by `galyleo` or the standard output/error
+file generated by the job. These files are stored in the `~/.galyleo` 
+directory created in your `$HOME` directory.
 
 <div id='additionalinfo'/>
 
@@ -397,24 +285,13 @@ hidden `~/.galyleo` directory created in your `HOME` directory.
 
 ### Expanse User Portal
 
-`galyleo` has been integrated with the Open OnDemand-based [Expanse User
-Portal](https://portal.expanse.sdsc.edu) to help simplify launching 
-Jupyter notebooks on Expanse. After logging into the portal, you can 
-access this web-based interface to `galyleo` from the *Interactive Apps*
-tab in the toolbar across the top of your browser, then select *Jupyter*. 
-
-### Containers
-
-SDSC builds and maintains a number of [custom Singularity containers for
-use on its HPC systems](https://github.com/mkandes/naked-singularity). 
-Pre-built copies of many of these containers are made available from a
-central storage location on each HPC system. Please check the following
-locations for the latest containers. If you do not find the container 
-you're looking for, please feel free to contact us and make a request
-for a container to be made available.
-
-On Expanse:
-- `/cm/shared/apps/containers/singularity`
+`galyleo` is integrated with the [Expanse User Portal](https://portal.expanse.sdsc.edu).
+After logging into the portal with your [ACCESS-CI](https://access-ci.org)
+credentials, you can access this web-based frontend interface to `galyleo`
+from the pinned *Jupyter* app shown on the main dashboard. You can also
+find it located under the the *Interactive Apps* tab in the toolbar 
+across the top of your browser window, where you can select the *Jupyter*
+app from its drop-down menu.
 
 ## Status
 
@@ -422,7 +299,7 @@ A work in progress.
 
 ## Contribute
 
-If you would like to contribute to the project, then please submit a 
+If you would like to contribute to the project, then please submit a
 pull request via GitHub. If you have a feature request or a problem to 
 report, then please create a GitHub issue.
 
@@ -432,13 +309,14 @@ Marty Kandes, Ph.D.
 Senior Computational & Data Science Research Specialist
 High-Performance Computing User Services Group
 Data-Enabled Scientific Computing Division
-San Diego Supercomputer Center  
+San Diego Supercomputer Center
+School of Computing, Information, and Data Sciences
 University of California, San Diego
 
 ## Version
 
-0.8.2
+0.8.3
 
 ## Last Updated
 
-Monday, March 17th, 2025
+Tuesday, May 13th, 2025

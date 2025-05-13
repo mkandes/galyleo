@@ -10,19 +10,6 @@
 #     A shell utility to help you launch Jupyter notebooks in a simple,
 #     secure way.
 #
-# USAGE
-#
-# DEPENDENCIES
-#
-#     jupyter
-#     jupyterlab
-#     satellite - https://github.com/sdsc-hpc-training-org/satellite
-#
-# TODO
-#
-#     Add support for non-jupyter-based web services; 
-#       e.g., Spark and TensorBoard; VNC
-#
 # AUTHOR(S)
 #
 #     Marty Kandes, Ph.D.
@@ -30,11 +17,12 @@
 #     High-Performance Computing User Services Group
 #     Data-Enabled Scientific Computing Division
 #     San Diego Supercomputer Center
+#     School of Computing, Information, and Data Sciences
 #     University of California, San Diego
 #
 # LAST UPDATED
 #
-#     Monday, March 17th, 2025
+#     Tuesday, May 13th, 2025
 #
 # ----------------------------------------------------------------------
 
@@ -152,20 +140,26 @@ function galyleo_launch() {
   local local_scratch_dir="${GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR}"
 
   # Declare input variables associated with environment modules.
-  local env_modules=''
+  local env_modules="${GALYLEO_DEFAULT_MODULE}"
 
   # Declare directories that append MODULEPATH environment variable
   local append_modpath=''
 
   # Declare input variables associated with Singularity containers.
   local singularity_image_file=''
+  local singularity_image_file_dirname=''
+  local singularity_image_file_basename=''
   local singularity_bind_mounts=''
   local singularity_gpu_type=''
 
   # Declare input variables associated with conda environments.
   local conda_init=''
+  local conda_init_dirname=''
+  local conda_init_basename=''
   local conda_env=''
   local conda_yml=''
+  local conda_yml_dirname=''
+  local conda_yml_basename=''
   local conda_version='latest'
   local conda_mamba='false'
   local conda_cache='false'
@@ -280,7 +274,9 @@ function galyleo_launch() {
         shift 1
         ;;
       --conda-init )
-        conda_init="${2}"
+        conda_init="$(realpath ${2})"
+        conda_init_dirname="$(dirname ${conda_init})"
+        conda_init_basename="$(basename ${conda_init})"
         shift 2
         ;;
       --conda-env )
@@ -288,7 +284,9 @@ function galyleo_launch() {
         shift 2
         ;;
       --conda-yml )
-        conda_yml="${2}"
+        conda_yml="$(realpath ${2})"
+        conda_yml_dirname="$(dirname ${conda_yml})"
+        conda_yml_basename="$(basename ${conda_yml})"
         shift 2
         ;;
       --conda-version )
@@ -636,12 +634,12 @@ function galyleo_launch() {
 
     # Create and/or activate a dynamically generated conda environment specified by the user.
     if [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]] && [[ -z "${singularity_image_file}" ]]; then
-      conda_env="$(grep name: ${OLDPWD}/${conda_yml} | awk '{print $2}')"
-      if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
-        mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
+      conda_env="$(grep name: ${conda_yml} | awk '{print $2}')"
+      if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}/" ]]; then
+        mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}/"
       fi
-      cp "${OLDPWD}/${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml}"
-      cd "${GALYLEO_CACHE_DIR}/${conda_env}"
+      cp "${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}/"
+      cd "${GALYLEO_CACHE_DIR}/${conda_env}/"
       md5sum -c "${conda_env}.md5" > /dev/null
       if [[ "${?}" -eq 0 ]]; then # unpack existing conda environment
         cd "${GALYLEO_CACHE_DIR}"
@@ -654,7 +652,7 @@ function galyleo_launch() {
       else # re/build (and cache) the conda environment
         cd "${GALYLEO_CACHE_DIR}"
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
-        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml} ./"
+        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml_basename} ./"
         slog append -f "${job_name}.sh" -m "wget https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}-Linux-x86_64.sh"
         slog append -f "${job_name}.sh" -m "chmod +x Miniconda3-${conda_version}-Linux-x86_64.sh"
         slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniconda3"'
@@ -665,15 +663,15 @@ function galyleo_launch() {
         slog append -f "${job_name}.sh" -m 'conda activate base'
         if [[ "${conda_mamba}" == 'true' ]]; then
           slog append -f "${job_name}.sh" -m 'conda install -y mamba -n base -c conda-forge'
-          slog append -f "${job_name}.sh" -m "mamba env create --file ${conda_yml}"
+          slog append -f "${job_name}.sh" -m "mamba env create --file ${conda_yml_basename}"
         else
-          slog append -f "${job_name}.sh" -m "conda env create --file ${conda_yml}"
+          slog append -f "${job_name}.sh" -m "conda env create --file ${conda_yml_basename}"
         fi
         if [[ "${conda_cache}" == 'true' ]]; then
           slog append -f "${job_name}.sh" -m 'conda install -y conda-pack -c conda-forge'
           slog append -f "${job_name}.sh" -m "conda pack -n ${conda_env} -o ${conda_env}.tar.gz"
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.tar.gz ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz"
-          slog append -f "${job_name}.sh" -m "md5sum ${conda_yml} > ${conda_env}.md5"
+          slog append -f "${job_name}.sh" -m "md5sum ${conda_yml_basename} > ${conda_env}.md5"
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.md5 ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.md5"
           slog append -f "${job_name}.sh" -m "cp Miniconda3-${conda_version}-Linux-x86_64.sh ${GALYLEO_CACHE_DIR}/${conda_env}/Miniconda3-${conda_version}-Linux-x86_64.sh"
         fi
@@ -754,12 +752,12 @@ function galyleo_launch() {
     # Create and/or activate a dynamically generated conda environment
     # within a container specified by the user.
     if [[ -z "${conda_env}" ]] && [[ -n "${conda_yml}" ]] && [[ -n "${singularity_image_file}" ]]; then
-      conda_env="$(grep name: ${OLDPWD}/${conda_yml} | awk '{print $2}')"
-      if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}" ]]; then
-        mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}"
+      conda_env="$(grep name: ${conda_yml} | awk '{print $2}')"
+      if [[ ! -d "${GALYLEO_CACHE_DIR}/${conda_env}/" ]]; then
+        mkdir -p "${GALYLEO_CACHE_DIR}/${conda_env}/"
       fi
-      cp "${OLDPWD}/${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml}"
-      cd "${GALYLEO_CACHE_DIR}/${conda_env}"
+      cp "${conda_yml}" "${GALYLEO_CACHE_DIR}/${conda_env}/"
+      cd "${GALYLEO_CACHE_DIR}/${conda_env}/"
       md5sum -c "${conda_env}.md5" > /dev/null
       if [[ "${?}" -ne 0 ]]; then # re/build (and cache) the conda environment within container
         cd "${GALYLEO_CACHE_DIR}"
@@ -767,7 +765,7 @@ function galyleo_launch() {
         slog append -f "${job_name}.sh" -m 'export CONDA_ENVS_PATH="${CONDA_INSTALL_PATH}/envs"'
         slog append -f "${job_name}.sh" -m 'export CONDA_PKGS_DIRS="${CONDA_INSTALL_PATH}/pkgs"'
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
-        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml} ./"
+        slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml_basename} ./"
         slog append -f "${job_name}.sh" -m "wget https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}-Linux-x86_64.sh"
         slog append -f "${job_name}.sh" -m "chmod +x Miniconda3-${conda_version}-Linux-x86_64.sh"
         slog append -f "${job_name}.sh" -m 'singularity instance start --bind ${LOCAL_SCRATCH_DIR} \'
@@ -783,15 +781,15 @@ function galyleo_launch() {
         slog append -f 'setup-conda.sh' -m 'conda activate base'
         if [[ "${conda_mamba}" == 'true' ]]; then
           slog append -f 'setup-conda.sh' -m 'conda install -y mamba -n base -c conda-forge'
-          slog append -f 'setup-conda.sh' -m "mamba env create -y -f ${conda_yml}"
+          slog append -f 'setup-conda.sh' -m "mamba env create -y -f ${conda_yml_basename}"
         else
-          slog append -f 'setup-conda.sh' -m "conda env create -y -f ${conda_yml}"
+          slog append -f 'setup-conda.sh' -m "conda env create -y -f ${conda_yml_basename}"
         fi
         if [[ "${conda_cache}" == 'true' ]]; then
           slog append -f 'setup-conda.sh' -m 'conda install -y conda-pack -c conda-forge'
           slog append -f 'setup-conda.sh' -m "conda pack -n ${conda_env} -o ${conda_env}.tar.gz"
           slog append -f 'setup-conda.sh' -m "cp ${conda_env}.tar.gz ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz"
-          slog append -f 'setup-conda.sh' -m "md5sum ${conda_yml} > ${conda_env}.md5"
+          slog append -f 'setup-conda.sh' -m "md5sum ${conda_yml_basename} > ${conda_env}.md5"
           slog append -f 'setup-conda.sh' -m "cp ${conda_env}.md5 ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.md5"
         fi
         slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/setup-conda.sh ./"
@@ -952,6 +950,14 @@ function galyleo_configure() {
   # Declare input variables associated with system architecture.
   local local_scratch_dir='/tmp'
 
+  # Declare a default software module to be loaded, even if --env-modules
+  # is not specified by user. Use case: Set default_module='singularitypro'
+  # such that users no longer need to specify the module when running a
+  # Singularity container on Expanse and/or TSCC. In addition, this use
+  # case will also model the behavior of galyleo2, where all software
+  # environments will be containerized by default.
+  local default_module=''
+
   # Read in command-line options and assign input variables to local
   # variables.
   while (("${#}" > 0)); do
@@ -995,6 +1001,9 @@ function galyleo_configure() {
         local_scratch_dir="${2}"
         shift 2
         ;;
+      --default-module )
+        default_module="${2}"
+        ;;
       *)
         slog error -m "Command-line option ${1} not recognized or not supported."
         return 1
@@ -1030,6 +1039,7 @@ function galyleo_configure() {
      slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_TIME_LIMIT='${time_limit}'"
      slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_JUPYTER_INTERFACE='${jupyter_interface}'"
      slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_LOCAL_SCRATCH_DIR='${local_scratch_dir}'"
+     slog append -f 'galyleo.conf' -m "declare -xr  GALYLEO_DEFAULT_MODULE='${default_module}'"
 
   fi
 
