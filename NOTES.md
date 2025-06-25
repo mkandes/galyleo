@@ -17,3 +17,4 @@
 - What should be configured in a user's ~/.condarc?
 - Use reverse proxy status page to communicate with users (docs, tips, surveys)
 - Use persistent overlays with Singularity containers (by default?)
+- Use only --oci-compliant capabilitites?
