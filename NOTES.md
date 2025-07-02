@@ -18,3 +18,4 @@
 - Use reverse proxy status page to communicate with users (docs, tips, surveys)
 - Use persistent overlays with Singularity containers (by default?)
 - Use only --oci-compliant capabilitites?
+- Distribute, cache, and update hostkey fingerprints for login nodes
