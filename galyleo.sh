@@ -14,15 +14,12 @@
 #
 #     Marty Kandes, Ph.D.
 #     Senior Computational & Data Science Research Specialist
-#     High-Performance Computing User Services Group
-#     Data-Enabled Scientific Computing Division
 #     San Diego Supercomputer Center
-#     School of Computing, Information, and Data Sciences
 #     University of California, San Diego
 #
 # LAST UPDATED
 #
-#     Tuesday, May 13th, 2025
+#     Tuesday, July 22nd, 2025
 #
 # ----------------------------------------------------------------------
 
@@ -99,7 +96,7 @@ fi
 #      | --conda-init <conda_init>
 #      | --conda-env <conda_env>
 #      | --conda-yml <conda_yml>
-#      | --conda-version <conda_version>
+##      | --conda-version <conda_version>
 #      | --mamba
 #      | --cache
 #      | --spark-home <spark_home>
@@ -160,7 +157,7 @@ function galyleo_launch() {
   local conda_yml=''
   local conda_yml_dirname=''
   local conda_yml_basename=''
-  local conda_version='latest'
+  #local conda_version='latest'
   local conda_mamba='false'
   local conda_cache='false'
 
@@ -289,10 +286,10 @@ function galyleo_launch() {
         conda_yml_basename="$(basename ${conda_yml})"
         shift 2
         ;;
-      --conda-version )
-        conda_version="${2}"
-        shift 2
-        ;;
+      #--conda-version )
+      #  conda_version="${2}"
+      #  shift 2
+      #  ;;
       --mamba )
         conda_mamba='true'
         shift 1
@@ -349,7 +346,7 @@ function galyleo_launch() {
   slog output -m "       | --conda-init        : ${conda_init}"
   slog output -m "       | --conda-env         : ${conda_env}"
   slog output -m "       | --conda-yml         : ${conda_yml}"
-  slog output -m "       | --conda-version     : ${conda_version}"
+  #slog output -m "       | --conda-version     : ${conda_version}"
   slog output -m "       | --mamba             : ${conda_mamba}"
   slog output -m "       | --cache             : ${conda_cache}"
   slog output -m "       | --spark-home        : ${spark_home}"
@@ -653,12 +650,12 @@ function galyleo_launch() {
         cd "${GALYLEO_CACHE_DIR}"
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
         slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml_basename} ./"
-        slog append -f "${job_name}.sh" -m "wget https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}-Linux-x86_64.sh"
-        slog append -f "${job_name}.sh" -m "chmod +x Miniconda3-${conda_version}-Linux-x86_64.sh"
-        slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniconda3"'
+        slog append -f "${job_name}.sh" -m "wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+        slog append -f "${job_name}.sh" -m "chmod +x Miniforge3-Linux-x86_64.sh"
+        slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniforge3"'
         slog append -f "${job_name}.sh" -m 'export CONDA_ENVS_PATH="${CONDA_INSTALL_PATH}/envs"'
         slog append -f "${job_name}.sh" -m 'export CONDA_PKGS_DIRS="${CONDA_INSTALL_PATH}/pkgs"'
-        slog append -f "${job_name}.sh" -m "./Miniconda3-${conda_version}-Linux-x86_64.sh -b -p \"\${CONDA_INSTALL_PATH}\""
+        slog append -f "${job_name}.sh" -m "./Miniforge3-Linux-x86_64.sh -b -p \"\${CONDA_INSTALL_PATH}\""
         slog append -f "${job_name}.sh" -m 'source "${CONDA_INSTALL_PATH}/etc/profile.d/conda.sh"'
         slog append -f "${job_name}.sh" -m 'conda activate base'
         if [[ "${conda_mamba}" == 'true' ]]; then
@@ -673,7 +670,6 @@ function galyleo_launch() {
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.tar.gz ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.tar.gz"
           slog append -f "${job_name}.sh" -m "md5sum ${conda_yml_basename} > ${conda_env}.md5"
           slog append -f "${job_name}.sh" -m "cp ${conda_env}.md5 ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_env}.md5"
-          slog append -f "${job_name}.sh" -m "cp Miniconda3-${conda_version}-Linux-x86_64.sh ${GALYLEO_CACHE_DIR}/${conda_env}/Miniconda3-${conda_version}-Linux-x86_64.sh"
         fi
         slog append -f "${job_name}.sh" -m "conda activate ${conda_env}"
       fi
@@ -761,19 +757,19 @@ function galyleo_launch() {
       md5sum -c "${conda_env}.md5" > /dev/null
       if [[ "${?}" -ne 0 ]]; then # re/build (and cache) the conda environment within container
         cd "${GALYLEO_CACHE_DIR}"
-        slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniconda3"'
+        slog append -f "${job_name}.sh" -m 'export CONDA_INSTALL_PATH="${LOCAL_SCRATCH_DIR}/miniforge3"'
         slog append -f "${job_name}.sh" -m 'export CONDA_ENVS_PATH="${CONDA_INSTALL_PATH}/envs"'
         slog append -f "${job_name}.sh" -m 'export CONDA_PKGS_DIRS="${CONDA_INSTALL_PATH}/pkgs"'
         slog append -f "${job_name}.sh" -m 'cd "${LOCAL_SCRATCH_DIR}"'
         slog append -f "${job_name}.sh" -m "cp ${GALYLEO_CACHE_DIR}/${conda_env}/${conda_yml_basename} ./"
-        slog append -f "${job_name}.sh" -m "wget https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}-Linux-x86_64.sh"
-        slog append -f "${job_name}.sh" -m "chmod +x Miniconda3-${conda_version}-Linux-x86_64.sh"
+        slog append -f "${job_name}.sh" -m "wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+        slog append -f "${job_name}.sh" -m "chmod +x Miniforge3-Linux-x86_64.sh"
         slog append -f "${job_name}.sh" -m 'singularity instance start --bind ${LOCAL_SCRATCH_DIR} \'
         if [[ -n "${singularity_gpu_type}" ]]; then
           slog append -f "${job_name}.sh" -m "  --${singularity_gpu_type} \\"
         fi
         slog append -f "${job_name}.sh" -m "  ${singularity_image_file} ${job_name}"
-        slog append -f "${job_name}.sh" -m "singularity exec instance://${job_name} ./Miniconda3-${conda_version}-Linux-x86_64.sh -b -p \"\${CONDA_INSTALL_PATH}\""
+        slog append -f "${job_name}.sh" -m "singularity exec instance://${job_name} ./Miniforge3-Linux-x86_64.sh -b -p \"\${CONDA_INSTALL_PATH}\""
 
         slog append -f 'setup-conda.sh' -m '#!/usr/bin/env bash'
         slog append -f 'setup-conda.sh' -m ''
@@ -1119,7 +1115,7 @@ function galyleo_help() {
   slog output -m "       | --conda-init        : ${conda_init}"
   slog output -m "       | --conda-env         : ${conda_env}"
   slog output -m "       | --conda-yml         : ${conda_yml}"
-  slog output -m "       | --conda-version     : ${conda_version}"
+  #slog output -m "       | --conda-version     : ${conda_version}"
   slog output -m "       | --mamba             : ${conda_mamba}"
   slog output -m "       | --cache             : ${conda_cache}"
   slog output -m "       | --spark-home        : ${spark_home}"

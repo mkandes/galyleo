@@ -307,16 +307,13 @@ report, then please create a GitHub issue.
 
 Marty Kandes, Ph.D.  
 Senior Computational & Data Science Research Specialist
-High-Performance Computing User Services Group
-Data-Enabled Scientific Computing Division
 San Diego Supercomputer Center
-School of Computing, Information, and Data Sciences
 University of California, San Diego
 
 ## Version
 
-0.8.3
+0.8.8
 
 ## Last Updated
 
-Tuesday, May 13th, 2025
+Tuesday, July 22nd, 2025
