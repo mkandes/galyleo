@@ -19,3 +19,4 @@
 - Use persistent overlays with Singularity containers (by default?)
 - Use only --oci-compliant capabilitites?
 - Distribute, cache, and update hostkey fingerprints for login nodes
+- Allow git clone operations to pull in notebooks, conda yaml files, contianer definition files, etc to build the working environment. e.g., similar to binder and colab.
