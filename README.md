@@ -45,7 +45,7 @@ On TSCC, there is now a software module available to load `galyleo` into
 your environment.
 
 ```bash
-module load galyleo/0.7.4 
+module load galyleo 
 ```
 
 Once `galyleo` is in your `PATH`, you can use its `launch` command to
@@ -92,6 +92,8 @@ Scheduler options:
 - `-m, --memory`: amount of memory (in GB) required for the job
 - `-g, --gpus`: number of GPUs required for the job
 - `-t, --time-limit`: set a maximum runtime (in HH:MM:SS) for the job
+- `-w, --nodelist`: request a specific list of hosts
+- `-x, --exclude`: request that a specific list of hosts not be included in the resources allocated to this job
 
 Jupyter options:
 
@@ -312,8 +314,8 @@ University of California, San Diego
 
 ## Version
 
-0.9.1
+0.9.2
 
 ## Last Updated
 
-Wedneday, September 30th, 2026
+Wednesday, October 7th, 2026

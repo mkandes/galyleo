@@ -7,18 +7,19 @@
 #
 # DESCRIPTION
 #
-#     A shell utility to help you launch Jupyter in a simple, secure way.
+#     A shell utility to help you launch Jupyter notebooks in a simple,
+#     secure way.
 #
 # AUTHOR(S)
 #
-#     Marty Kandes, PhD
+#     Marty Kandes, Ph.D.
 #     Senior Computational & Data Science Research Specialist
 #     San Diego Supercomputer Center
 #     University of California, San Diego
 #
 # LAST UPDATED
 #
-#     Wednesday, September 30th, 2026
+#     Sunday, August 9th, 2026
 #
 # ----------------------------------------------------------------------
 
@@ -84,6 +85,8 @@ fi
 #      | --gres <gres>
 #   -t | --time-limit <time_limit>
 #   -C | --constraint <constraint>
+#   -w | --nodelist <nodelist>
+#   -x | --exclude <exclude>
 #   -i | --interface <jupyter_interface>
 #   -d | --notebook-dir <jupyter_notebook_dir>
 #      | --scratch-dir <local_scratch_dir>
@@ -127,6 +130,8 @@ function galyleo_launch() {
   local gres=''
   local time_limit="${GALYLEO_DEFAULT_TIME_LIMIT}"
   local constraint=''
+  local nodelist=''
+  local exclude=''
 
   # Declare input variables associated with Jupyter runtime environment.
   local jupyter_interface="${GALYLEO_DEFAULT_JUPYTER_INTERFACE}"
@@ -227,6 +232,14 @@ function galyleo_launch() {
         ;;
       -C | --constraint )
         constraint="${2}"
+        shift 2
+        ;;
+      -w | --nodelist )
+        nodelist="${2}"
+        shift 2
+        ;;
+      -x | --exclude )
+        exclude="${2}"
         shift 2
         ;;
       -i | --interface )
@@ -334,6 +347,8 @@ function galyleo_launch() {
   slog output -m "       | --gres              : ${gres}"
   slog output -m "    -t | --time-limit        : ${time_limit}"
   slog output -m "    -C | --constraint        : ${constraint}"
+  slog output -m "    -w | --nodelist          : ${nodelist}"
+  slog output -m "    -x | --exclude           : ${exclude}"
   slog output -m "    -i | --interface         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
   slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
@@ -400,6 +415,34 @@ function galyleo_launch() {
     if [[ ! -w "${jupyter_notebook_dir}" ]]; then
       slog error -m "Jupyter notebook directory exists, but you do not have write permissions: ${jupyter_notebook_dir}"
       return 1
+    fi
+
+    # Check if the user provided a nodelist or exclude file. If the
+    # nodelist or exclude value contains a '/', then treat it as a path to
+    # a file. Verify that the file exists and is readable before proceeding.
+    if [[ -n "${nodelist}" ]]; then
+      if [[ "${nodelist}" == */* ]]; then
+        if [[ ! -f "${nodelist}" ]]; then
+          slog error -m "nodelist file does not exist: ${nodelist}"
+          return 1
+        fi
+        if [[ ! -r "${nodelist}" ]]; then
+          slog error -m "nodelist file exists, but is not readable: ${nodelist}"
+          return 1
+        fi
+      fi
+    fi
+    if [[ -n "${exclude}" ]]; then
+      if [[ "${exclude}" == */* ]]; then
+        if [[ ! -f "${exclude}" ]]; then
+          slog error -m "exclude file does not exist: ${exclude}"
+          return 1
+        fi
+        if [[ ! -r "${exclude}" ]]; then
+          slog error -m "exclude file exists, but is not readable: ${exclude}"
+          return 1
+        fi
+      fi
     fi
 
     # Check if any directories to be append to MODULEPATH exist and
@@ -571,6 +614,12 @@ function galyleo_launch() {
     slog append -f "${job_name}.sh" -m "#SBATCH --time=${time_limit}"
     if [[ -n "${constraint}" ]]; then
       slog append -f "${job_name}.sh" -m "#SBATCH --constraint=${constraint}"
+    fi
+    if [[ -n "${nodelist}" ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --nodelist=${nodelist}"
+    fi
+    if [[ -n "${exclude}" ]]; then
+      slog append -f "${job_name}.sh" -m "#SBATCH --exclude=${exclude}"
     fi
     slog append -f "${job_name}.sh" -m "#SBATCH --no-requeue"
     slog append -f "${job_name}.sh" -m "#SBATCH --export=ALL"
@@ -1103,6 +1152,8 @@ function galyleo_help() {
   slog output -m "       | --gres              : ${gres}"
   slog output -m "    -t | --time-limit        : ${time_limit}"
   slog output -m "    -C | --constraint        : ${constraint}"
+  slog output -m "    -w | --nodelist          : ${nodelist}"
+  slog output -m "    -x | --exclude           : ${exclude}"
   slog output -m "    -i | --interface         : ${jupyter_interface}"
   slog output -m "    -d | --notebook-dir      : ${jupyter_notebook_dir}"
   slog output -m "       | --scratch-dir       : ${local_scratch_dir}"
